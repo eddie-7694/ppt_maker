@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pure Vanilla Slide Demo</title>
+<style>
+/* ===== RESET ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111; overflow: hidden; }
+
+/* ===== PROGRESS BAR ===== */
+.progress-bar-container {
+  position: fixed; top: 0; left: 0; width: 100%; height: 4px;
+  background: rgba(255,255,255,0.15); z-index: 200;
+}
+.progress-bar-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #4f9eff, #a78bfa);
+  transition: width 0.35s ease;
+}
+
+/* ===== STAGE: 뷰포트 전체, Flexbox 중앙 정렬 ===== */
+.stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100dvh;      /* iOS Safari: dvh로 주소창 제외 */
+  background: #111;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ===== DECK: 16:9 고정 + 반응형 ===== */
+.deck {
+  aspect-ratio: 16 / 9;
+  width: min(100vw, 177.78vh);  /* letterbox/pillarbox 자동 */
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 0 60px rgba(0,0,0,0.6);
+}
+
+/* ===== 슬라이드: absolute 스택 ===== */
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 5% 7%;
+  /* GPU 컴포지터만 사용하는 속성만 transition */
+  transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              opacity 0.45s ease;
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.slide.active {
+  transform: translateX(0%);
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+.slide.prev { transform: translateX(-100%); opacity: 0; }
+.slide.next { transform: translateX(100%);  opacity: 0; }
+.slide.no-transition { transition: none !important; }
+
+/* ===== 슬라이드 테마별 배경 ===== */
+.slide-1 { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); color: #fff; }
+.slide-2 { background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%); color: #fff; }
+.slide-3 { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; }
+.slide-4 { background: linear-gradient(135deg, #200122 0%, #6f0000 100%); color: #fff; }
+.slide-5 { background: linear-gradient(135deg, #004d40 0%, #00796b 100%); color: #fff; }
+
+/* ===== 슬라이드 내부 요소 ===== */
+.slide-label {
+  font-size: clamp(0.6rem, 1vw, 0.85rem);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  opacity: 0.6;
+  margin-bottom: 0.5em;
+}
+h1 { font-size: clamp(1.8rem, 5vw, 4rem); font-weight: 700; line-height: 1.1; margin-bottom: 0.4em; }
+h2 { font-size: clamp(1.4rem, 3.5vw, 3rem); font-weight: 700; line-height: 1.2; margin-bottom: 0.5em; }
+.subtitle {
+  font-size: clamp(0.9rem, 2vw, 1.6rem);
+  opacity: 0.75;
+  line-height: 1.5;
+}
+.body-text {
+  font-size: clamp(0.8rem, 1.5vw, 1.3rem);
+  line-height: 1.7;
+  opacity: 0.85;
+  margin-top: 0.5em;
+}
+ul.build-list {
+  list-style: none;
+  margin-top: 0.5em;
+}
+ul.build-list li {
+  font-size: clamp(0.8rem, 1.5vw, 1.25rem);
+  padding: 0.3em 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  opacity: 0.9;
+}
+ul.build-list li::before {
+  content: '▸';
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+/* 코드 블록 */
+.code-block {
+  background: rgba(0,0,0,0.4);
+  border-radius: 8px;
+  padding: 3% 4%;
+  margin-top: 1em;
+  width: 100%;
+  overflow: hidden;
+}
+.code-block code {
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: clamp(0.65rem, 1.2vw, 1rem);
+  line-height: 1.7;
+}
+.line {
+  display: block;
+  padding: 1px 8px;
+  border-left: 3px solid transparent;
+  border-radius: 2px;
+  transition: background 0.3s, opacity 0.3s, border-color 0.3s;
+  opacity: 0.4;
+}
+.line.highlighted {
+  opacity: 1;
+  background: rgba(167, 139, 250, 0.2);
+  border-left-color: #a78bfa;
+}
+.line.past { opacity: 0.65; }
+
+/* ===== 빌드 효과 ===== */
+[data-step] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  visibility: hidden;
+}
+[data-step].visible {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+/* ===== UI 컨트롤 (transform 없는 body 직계 자식) ===== */
+.slide-counter {
+  position: fixed;
+  bottom: 20px; right: 24px;
+  font-size: clamp(11px, 1.2vw, 14px);
+  color: rgba(255,255,255,0.6);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  z-index: 150;
+}
+
+.thumbnail-nav {
+  position: fixed;
+  bottom: 18px; left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 150;
+}
+.thumbnail-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.35);
+  border: none;
+  cursor: pointer;
+  transition: background 0.25s, transform 0.25s;
+}
+.thumbnail-dot.active {
+  background: #fff;
+  transform: scale(1.45);
+}
+.thumbnail-dot:focus-visible { outline: 2px solid #4f9eff; }
+
+/* ===== 화자 노트 ===== */
+.speaker-notes { display: none; }
+body.presenter-mode .speaker-notes {
+  display: block;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,0.92);
+  color: #e5e7eb;
+  padding: 14px 24px 20px;
+  font-size: clamp(11px, 1.3vw, 14px);
+  line-height: 1.6;
+  z-index: 300;
+  border-top: 2px solid #a78bfa;
+  max-height: 22vh;
+  overflow-y: auto;
+}
+.speaker-notes::before {
+  content: '🎤 화자 노트';
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #a78bfa;
+  margin-bottom: 6px;
+}
+
+/* 힌트 오버레이 */
+.hint {
+  position: fixed;
+  top: 12px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.7);
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  z-index: 200;
+  pointer-events: none;
+  transition: opacity 1s ease;
+}
+.hint.hidden { opacity: 0; }
+
+/* 전환 중 버튼 비활성화 스타일 */
+.nav-btn {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.5);
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 150;
+  transition: background 0.2s, opacity 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.nav-btn.prev-btn { left: 16px; }
+.nav-btn.next-btn { right: 16px; }
+.nav-btn:disabled { opacity: 0.2; cursor: default; }
+</style>
+</head>
+<body>
+
+<!-- 진행바 -->
+<div class="progress-bar-container">
+  <div class="progress-bar-fill" id="progressFill"></div>
+</div>
+
+<!-- 힌트 -->
+<div class="hint" id="hint">← → 키 또는 스와이프로 탐색 &nbsp;|&nbsp; S: 화자 노트</div>
+
+<!-- 무대 -->
+<div class="stage" id="stage">
+  <div class="deck" id="deck">
+
+    <!-- 슬라이드 1: 타이틀 (빌드 없음) -->
+    <section class="slide slide-1 active"
+             role="group" aria-roledescription="slide"
+             aria-label="1 / 5" tabindex="0">
+      <div class="slide-label">Vanilla JS Slides</div>
+      <h1>순수 바닐라<br>슬라이드 데모</h1>
+      <p class="subtitle">HTML · CSS · JavaScript만으로 구현한<br>풀-피처 프레젠테이션 시스템</p>
+      <aside class="speaker-notes">
+        첫 슬라이드입니다. 외부 라이브러리 없이 순수 바닐라로 구현했습니다.
+        키보드 화살표, 스페이스, PageUp/Down으로 탐색 가능합니다.
+      </aside>
+    </section>
+
+    <!-- 슬라이드 2: 빌드 효과 (data-step) -->
+    <section class="slide slide-2 next"
+             role="group" aria-roledescription="slide"
+             aria-label="2 / 5" tabindex="-1">
+      <h2>빌드 효과 데모</h2>
+      <p class="subtitle">→ 키를 누를 때마다 항목이 등장합니다</p>
+      <ul class="build-list">
+        <li data-step="1">GPU 가속: transform과 opacity만 애니메이션</li>
+        <li data-step="2">isAnimating 플래그로 이벤트 잠금/해제</li>
+        <li data-step="3">data-step 속성으로 순차 등장 제어</li>
+        <li data-step="4">빌드 소진 후 다음 슬라이드로 이동</li>
+      </ul>
+      <aside class="speaker-notes">
+        각 항목이 클릭/키 입력마다 하나씩 등장합니다.
+        모든 항목이 등장한 후 다음 슬라이드로 넘어갑니다.
+        이전 슬라이드로 돌아오면 빌드가 초기화됩니다.
+      </aside>
+    </section>
+
+    <!-- 슬라이드 3: 코드 하이라이트 -->
+    <section class="slide slide-3 next"
+             role="group" aria-roledescription="slide"
+             aria-label="3 / 5" tabindex="-1">
+      <h2>코드 하이라이트</h2>
+      <p class="subtitle" data-step="0">→ 키로 줄을 순서대로 강조합니다</p>
+      <div class="code-block">
+        <code>
+          <span class="line" data-highlight="1">function goTo(nextIdx, dir) {</span>
+          <span class="line" data-highlight="2">  if (this.locked) return;</span>
+          <span class="line" data-highlight="3">  this.locked = true;</span>
+          <span class="line" data-highlight="4">  const to = this.slides[nextIdx];</span>
+          <span class="line" data-highlight="5">  to.classList.add('active');</span>
+          <span class="line" data-highlight="6">}</span>
+        </code>
+      </div>
+      <aside class="speaker-notes">
+        코드 블록의 각 줄이 순서대로 강조됩니다.
+        이미 지나간 줄은 흐리게, 현재 줄은 보라색 강조, 아직 안 된 줄은 더 흐리게 표시됩니다.
+      </aside>
+    </section>
+
+    <!-- 슬라이드 4: 레이아웃 설명 -->
+    <section class="slide slide-4 next"
+             role="group" aria-roledescription="slide"
+             aria-label="4 / 5" tabindex="-1">
+      <h2>핵심 아키텍처</h2>
+      <ul class="build-list">
+        <li data-step="1">Stage: <code>display:flex</code> + 뷰포트 전체 중앙 정렬</li>
+        <li data-step="2">Deck: <code>aspect-ratio:16/9</code> + <code>width:min(100vw,177.78vh)</code></li>
+        <li data-step="3">Slide: <code>position:absolute; inset:0</code> 스택 구조</li>
+        <li data-step="4">Font: <code>clamp(min, Nvw, max)</code> 미디어쿼리 없이 반응형</li>
+        <li data-step="5">Nav: Pointer Events API로 마우스·터치 단일 처리</li>
+      </ul>
+      <aside class="speaker-notes">
+        무대-덱-슬라이드 3단계 구조가 핵심입니다.
+        min() 함수로 가로세로 중 더 제한적인 방향에 맞춰 letterbox/pillarbox가 자동 처리됩니다.
+      </aside>
+    </section>
+
+    <!-- 슬라이드 5: 마무리 -->
+    <section class="slide slide-5 next"
+             role="group" aria-roledescription="slide"
+             aria-label="5 / 5" tabindex="-1">
+      <div class="slide-label">완료</div>
+      <h1>감사합니다</h1>
+      <p class="subtitle">순수 바닐라 HTML/CSS/JS<br>단 하나의 파일로 구현</p>
+      <p class="body-text" data-step="1">
+        ✓ 16:9 반응형 레이아웃 &nbsp;·&nbsp;
+        ✓ 키보드 + 터치 네비게이션<br>
+        ✓ 슬라이드 전환 애니메이션 &nbsp;·&nbsp;
+        ✓ 빌드 효과 &nbsp;·&nbsp;
+        ✓ 코드 하이라이트<br>
+        ✓ URL hash 동기화 &nbsp;·&nbsp;
+        ✓ 화자 노트 (S키)
+      </p>
+      <aside class="speaker-notes">
+        마지막 슬라이드입니다. 질문을 받을 시간입니다.
+        이 데모 파일 자체가 완전한 레퍼런스 구현입니다.
+      </aside>
+    </section>
+
+  </div><!-- /deck -->
+</div><!-- /stage -->
+
+<!-- 버튼 네비게이션 (transform 없는 body 직계 자식) -->
+<button class="nav-btn prev-btn" id="btnPrev" aria-label="이전 슬라이드">‹</button>
+<button class="nav-btn next-btn" id="btnNext" aria-label="다음 슬라이드">›</button>
+
+<!-- 슬라이드 번호 -->
+<div class="slide-counter" id="slideCounter" aria-live="polite">1 / 5</div>
+
+<!-- 썸네일 닷 네비게이터 -->
+<nav class="thumbnail-nav" id="thumbnailNav" aria-label="슬라이드 네비게이터"></nav>
+
+<script>
+'use strict';
+
+class Deck {
+  constructor() {
+    this.slides   = Array.from(document.querySelectorAll('.slide'));
+    this.total    = this.slides.length;
+    this.idx      = 0;
+    this.step     = 0;
+    this.locked   = false;
+    this.DURATION = 450; // CSS transition 시간과 일치
+
+    this._buildThumbnails();
+    this._initKeyboard();
+    this._initPointer();
+    this._initButtons();
+    this._restoreFromHash();
+    this._hideHint();
+  }
+
+  // ── 슬라이드 최대 스텝 ──────────────────────────────────────────────
+  _maxStep(slide) {
+    const steps = slide.querySelectorAll('[data-step]');
+    return steps.length
+      ? Math.max(...[...steps].map(e => +e.dataset.step))
+      : 0;
+  }
+
+  // ── 빌드 적용 ───────────────────────────────────────────────────────
+  _applyStep(slide, step) {
+    slide.querySelectorAll('[data-step]').forEach(el => {
+      el.classList.toggle('visible', +el.dataset.step <= step);
+    });
+    // 코드 하이라이트 연동
+    slide.querySelectorAll('.line[data-highlight]').forEach(line => {
+      const h = +line.dataset.highlight;
+      line.classList.toggle('highlighted', h === step);
+      line.classList.toggle('past', h < step);
+    });
+  }
+
+  // ── 슬라이드 진입 ───────────────────────────────────────────────────
+  _enterSlide(idx, skipTransition = false) {
+    this.idx = idx;
+    this.step = 0;
+    const slide = this.slides[idx];
+
+    // 빌드 상태 초기화
+    slide.querySelectorAll('[data-step]').forEach(el => el.classList.remove('visible'));
+    slide.querySelectorAll('.line').forEach(l => l.classList.remove('highlighted', 'past'));
+    this._applyStep(slide, 0);
+
+    // aria 접근성
+    this.slides.forEach((s, i) => {
+      if (i === idx) {
+        s.removeAttribute('aria-hidden');
+        s.setAttribute('tabindex', '0');
+      } else {
+        s.setAttribute('aria-hidden', 'true');
+        s.setAttribute('tabindex', '-1');
+      }
+    });
+
+    this._updateUI();
+    history.pushState({ idx }, '', `#slide-${idx + 1}`);
+  }
+
+  // ── 다음 / 이전 ─────────────────────────────────────────────────────
+  next() {
+    if (this.locked) return;
+    const maxS = this._maxStep(this.slides[this.idx]);
+    if (this.step < maxS) {
+      this._applyStep(this.slides[this.idx], ++this.step);
+      return;
+    }
+    if (this.idx < this.total - 1) this._goTo(this.idx + 1, 'next');
+  }
+
+  prev() {
+    if (this.locked) return;
+    if (this.step > 0) {
+      this._applyStep(this.slides[this.idx], --this.step);
+      return;
+    }
+    if (this.idx > 0) this._goTo(this.idx - 1, 'prev');
+  }
+
+  // ── 슬라이드 전환 (애니메이션) ─────────────────────────────────────
+  _goTo(nextIdx, dir) {
+    if (this.locked || nextIdx === this.idx) return;
+    if (nextIdx < 0 || nextIdx >= this.total) return;
+
+    this.locked = true;
+    document.getElementById('btnPrev').disabled = true;
+    document.getElementById('btnNext').disabled = true;
+
+    const from = this.slides[this.idx];
+    const to   = this.slides[nextIdx];
+
+    // will-change 힌트 (전환 직전만)
+    from.style.willChange = 'transform, opacity';
+    to.style.willChange   = 'transform, opacity';
+
+    // 진입 슬라이드를 transition 없이 시작 위치로 이동
+    to.classList.add('no-transition');
+    to.classList.remove('prev', 'next', 'active');
+    to.classList.add(dir === 'next' ? 'next' : 'prev');
+    void to.offsetWidth; // 강제 reflow: 브라우저가 위치를 확정하도록
+    to.classList.remove('no-transition');
+
+    // 두 슬라이드 동시 이동 시작
+    from.classList.remove('active');
+    from.classList.add(dir === 'next' ? 'prev' : 'next');
+    to.classList.remove('prev', 'next');
+    to.classList.add('active');
+
+    // 진입 후 상태 초기화
+    this._enterSlide(nextIdx);
+
+    // 잠금 해제: transitionend + transitioncancel + setTimeout fallback
+    const unlock = () => {
+      clearTimeout(fallback);
+      from.style.willChange = 'auto';
+      to.style.willChange   = 'auto';
+      this.locked = false;
+      document.getElementById('btnPrev').disabled = false;
+      document.getElementById('btnNext').disabled = false;
+    };
+
+    const onEnd = (e) => {
+      if (e.propertyName !== 'transform') return;
+      to.removeEventListener('transitioncancel', onCancel);
+      unlock();
+    };
+    const onCancel = () => {
+      to.removeEventListener('transitionend', onEnd);
+      unlock();
+    };
+
+    to.addEventListener('transitionend', onEnd, { once: true });
+    to.addEventListener('transitioncancel', onCancel, { once: true });
+    const fallback = setTimeout(unlock, this.DURATION + 60);
+  }
+
+  // ── UI 업데이트 ─────────────────────────────────────────────────────
+  _updateUI() {
+    const n = this.idx + 1;
+    document.getElementById('slideCounter').textContent = `${n} / ${this.total}`;
+    document.getElementById('progressFill').style.width =
+      this.total > 1 ? `${(this.idx / (this.total - 1)) * 100}%` : '100%';
+    document.querySelectorAll('.thumbnail-dot')
+      .forEach((d, i) => d.classList.toggle('active', i === this.idx));
+  }
+
+  // ── 썸네일 닷 생성 ─────────────────────────────────────────────────
+  _buildThumbnails() {
+    const nav = document.getElementById('thumbnailNav');
+    this.slides.forEach((_, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'thumbnail-dot';
+      btn.setAttribute('aria-label', `슬라이드 ${i + 1}로 이동`);
+      btn.addEventListener('click', () => {
+        if (this.locked) return;
+        if (i === this.idx) return;
+        this._goTo(i, i > this.idx ? 'next' : 'prev');
+      });
+      nav.appendChild(btn);
+    });
+  }
+
+  // ── 키보드 네비게이션 ───────────────────────────────────────────────
+  _initKeyboard() {
+    document.addEventListener('keydown', e => {
+      // 입력 요소 포커스 시 무시
+      if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+      if (e.target.isContentEditable) return;
+      if (e.repeat) return; // 키 홀드 반복 차단
+
+      let handled = false;
+      switch (e.key) {
+        case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
+          this.next(); handled = true; break;
+        case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+          this.prev(); handled = true; break;
+        case 'Home': this._goTo(0, 'prev'); handled = true; break;
+        case 'End':  this._goTo(this.total - 1, 'next'); handled = true; break;
+        case 's': case 'S':
+          document.body.classList.toggle('presenter-mode'); handled = true; break;
+      }
+      if (handled) e.preventDefault();
+    });
+  }
+
+  // ── 터치/포인터 네비게이션 ─────────────────────────────────────────
+  _initPointer() {
+    const el = document.getElementById('stage');
+    let startX, startY, startT, active = false;
+    const THRESHOLD = 50, MAX_TIME = 500;
+
+    el.addEventListener('pointerdown', e => {
+      if (!e.isPrimary) return;
+      active = true;
+      startX = e.clientX; startY = e.clientY; startT = Date.now();
+      el.setPointerCapture(e.pointerId);
+    });
+
+    el.addEventListener('pointermove', e => {
+      if (!active || !e.isPrimary) return;
+      const dx = Math.abs(e.clientX - startX);
+      const dy = Math.abs(e.clientY - startY);
+      // 수평 스와이프 판단 시 스크롤 방지
+      if (dx > dy && dx > 10) e.preventDefault();
+    }, { passive: false }); // passive:false 필수
+
+    el.addEventListener('pointerup', e => {
+      if (!active || !e.isPrimary) return;
+      active = false;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Date.now() - startT > MAX_TIME) return;
+      if (Math.abs(dx) < THRESHOLD) return;
+      if (Math.abs(dy) > Math.abs(dx)) return; // 수직 제스처 무시
+      dx < 0 ? this.next() : this.prev();
+    });
+
+    el.addEventListener('pointercancel', () => { active = false; });
+  }
+
+  // ── 버튼 ────────────────────────────────────────────────────────────
+  _initButtons() {
+    document.getElementById('btnPrev').addEventListener('click', () => this.prev());
+    document.getElementById('btnNext').addEventListener('click', () => this.next());
+
+    // 뒤로/앞으로가기
+    window.addEventListener('popstate', e => {
+      if (e.state?.idx !== undefined) {
+        const i = e.state.idx;
+        // 전환 없이 상태만 복원
+        this.slides[this.idx].classList.remove('active');
+        this.slides[this.idx].classList.add(i < this.idx ? 'next' : 'prev');
+        this.slides[i].classList.remove('prev','next');
+        this.slides[i].classList.add('active');
+        this._enterSlide(i);
+      }
+    });
+  }
+
+  // ── URL hash 복원 ───────────────────────────────────────────────────
+  _restoreFromHash() {
+    const m = location.hash.match(/^#slide-(\d+)$/);
+    const targetIdx = m ? Math.max(0, Math.min(+m[1] - 1, this.total - 1)) : 0;
+    if (targetIdx !== 0) {
+      // transition 없이 바로 이동
+      this.slides[0].classList.remove('active');
+      this.slides[0].classList.add('prev');
+      this.slides[targetIdx].classList.remove('next');
+      this.slides[targetIdx].classList.add('active');
+    }
+    this._enterSlide(targetIdx);
+  }
+
+  // ── 힌트 자동 숨김 ─────────────────────────────────────────────────
+  _hideHint() {
+    const hint = document.getElementById('hint');
+    setTimeout(() => hint.classList.add('hidden'), 3500);
+  }
+}
+
+// ── 초기화 ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => new Deck());
+</script>
+</body>
+</html>

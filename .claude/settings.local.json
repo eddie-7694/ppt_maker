@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(open:*)",
+      "Read(//Users/eddie/.claude/**)",
+      "Bash(python3 -m json.tool)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>사진 레이아웃 시안 3종</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+body { font-family: 'Noto Sans KR', 'Inter', sans-serif; }
+
+:root {
+  --green: #00C875; --green-dim: rgba(0,200,117,0.12); --green-border: rgba(0,200,117,0.28);
+  --gold: #C6A55C; --white: #FFFFFF; --muted: rgba(255,255,255,0.45);
+  --card-bg: rgba(255,255,255,0.06); --card-border: rgba(255,255,255,0.1);
+}
+
+/* ── STAGE / DECK ── */
+.stage { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; background: #111; overflow: hidden; }
+.deck  { aspect-ratio: 16/9; width: min(100vw, 177.78vh); position: relative; overflow: hidden; background: #000; }
+
+/* ── SLIDE STACK ── */
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center; text-align: center;
+  transition: transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.45s ease;
+  transform: translateX(100%); opacity: 0; pointer-events: none; user-select: none;
+  color: var(--white); overflow: hidden;
+}
+.slide.active { transform: translateX(0%);   opacity: 1; pointer-events: auto; z-index: 1; }
+.slide.prev   { transform: translateX(-100%); opacity: 0; }
+.slide.next   { transform: translateX(100%);  opacity: 0; }
+.slide.no-transition { transition: none !important; }
+
+/* ── SLIDE NUM ── */
+.slide-num {
+  position: absolute; top: 4%; right: 4%;
+  font-family: 'Inter', sans-serif; font-size: clamp(9px, 0.78vw, 11px);
+  color: rgba(255,255,255,0.2); font-variant-numeric: tabular-nums; user-select: none;
+}
+
+/* ── LABEL ── */
+@keyframes blink-cursor { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+.slide-label {
+  font-family: 'JetBrains Mono', monospace; font-size: clamp(0.5rem, 0.9vw, 0.82rem);
+  letter-spacing: 0.22em; color: var(--green); margin-bottom: 0.5em;
+  display: flex; align-items: center; gap: 0.5em;
+  position: relative; z-index: 2;
+}
+.slide-label::before { content: '>'; animation: blink-cursor 1s step-end infinite; }
+
+/* ── PROGRESS BAR ── */
+.progress-bar-container { position: fixed; top: 0; left: 0; width: 100%; height: 3px; background: rgba(255,255,255,0.07); z-index: 200; }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green), #00FF99); transition: width 0.35s ease; }
+
+/* ── CONTROLS ── */
+.slide-counter { position: fixed; bottom: 16px; right: 20px; font-family: 'Inter', sans-serif; font-size: 11px; letter-spacing: 0.1em; color: rgba(255,255,255,0.22); user-select: none; z-index: 150; }
+.thumbnail-nav { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 150; }
+.thumbnail-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.18); border: none; cursor: pointer; transition: background 0.25s, transform 0.25s; }
+.thumbnail-dot.active { background: var(--green); transform: scale(1.55); }
+.nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); color: rgba(255,255,255,0.22); width: 34px; height: 34px; border-radius: 50%; font-size: 18px; cursor: pointer; z-index: 150; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s; }
+.nav-btn:hover { background: rgba(0,200,117,0.1); color: var(--green); }
+.nav-btn.prev-btn { left: 12px; }
+.nav-btn.next-btn { right: 12px; }
+.hint { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(15,15,15,0.85); color: rgba(255,255,255,0.35); font-family: 'Inter', sans-serif; font-size: 11px; padding: 5px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); z-index: 200; pointer-events: none; transition: opacity 1s ease; white-space: nowrap; }
+.hint.hidden { opacity: 0; }
+
+/* ══════════════════════════════════════════
+   슬라이드 1: 풀블리드 배경 사진 + 텍스트 오버레이
+   ══════════════════════════════════════════ */
+.slide-fullbleed .bg-photo {
+  position: absolute; inset: 0;
+  background: url('https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1600&q=80') center/cover no-repeat;
+  filter: brightness(0.35);
+}
+.slide-fullbleed .overlay-gradient {
+  position: absolute; inset: 0;
+  background: linear-gradient(to right, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.2) 100%);
+}
+.slide-fullbleed .content {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column;
+  align-items: flex-start; justify-content: center;
+  padding: 6% 8%; width: 100%; height: 100%;
+  text-align: left;
+}
+.slide-fullbleed .overline {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.5rem, 0.9vw, 0.82rem);
+  letter-spacing: 0.22em; color: var(--green); margin-bottom: 0.8em;
+  display: flex; align-items: center; gap: 0.5em;
+}
+.slide-fullbleed .overline::before { content: '>'; animation: blink-cursor 1s step-end infinite; }
+.slide-fullbleed h2 {
+  font-size: clamp(1.8rem, 4.2vw, 4rem);
+  font-weight: 700; line-height: 1.15; letter-spacing: -0.02em;
+  color: var(--white); max-width: 55%; word-break: keep-all; margin-bottom: 0.5em;
+}
+.slide-fullbleed .sub {
+  font-size: clamp(0.7rem, 1.4vw, 1.25rem); color: rgba(255,255,255,0.6);
+  max-width: 45%; line-height: 1.65;
+}
+.slide-fullbleed .photo-credit {
+  position: absolute; bottom: 5%; right: 4%;
+  font-size: clamp(0.38rem, 0.65vw, 0.56rem); color: rgba(255,255,255,0.18);
+  font-family: 'Inter', sans-serif; letter-spacing: 0.06em;
+}
+
+/* ══════════════════════════════════════════
+   슬라이드 2: 좌우 분할 — 왼쪽 인물사진 / 오른쪽 인용
+   ══════════════════════════════════════════ */
+.slide-split { padding: 0 !important; }
+.split-photo-half {
+  position: absolute; top: 0; left: 0; bottom: 0; width: 42%;
+  background: url('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80') center/cover no-repeat;
+}
+.split-photo-half::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to right, transparent 60%, #000 100%);
+}
+.split-text-half {
+  position: absolute; top: 0; right: 0; bottom: 0; left: 40%;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: flex-start;
+  padding: 6% 8% 6% 6%; text-align: left;
+}
+.split-name-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.44rem, 0.8vw, 0.72rem);
+  letter-spacing: 0.2em; color: var(--green); margin-bottom: 0.5em;
+}
+.split-person-name {
+  font-size: clamp(1.2rem, 2.8vw, 2.6rem);
+  font-weight: 700; color: var(--white); line-height: 1.15;
+  margin-bottom: 0.15em;
+}
+.split-person-role {
+  font-size: clamp(0.55rem, 1.05vw, 0.92rem);
+  color: var(--green); margin-bottom: 1em; font-weight: 400;
+}
+.split-divider-line {
+  width: clamp(28px, 4vw, 44px); height: 2px;
+  background: var(--green); margin-bottom: 1em; opacity: 0.6;
+}
+.split-quote {
+  font-size: clamp(0.72rem, 1.4vw, 1.25rem);
+  color: rgba(255,255,255,0.82); line-height: 1.7;
+  max-width: 90%; font-style: italic; word-break: keep-all;
+  margin-bottom: 1.2em;
+}
+.split-stats {
+  display: flex; gap: 2em;
+}
+.split-stat-item { display: flex; flex-direction: column; gap: 0.15em; }
+.split-stat-num  { font-size: clamp(0.95rem, 2vw, 1.8rem); font-weight: 700; color: var(--gold); }
+.split-stat-desc { font-size: clamp(0.42rem, 0.78vw, 0.68rem); color: var(--muted); }
+
+/* ══════════════════════════════════════════
+   슬라이드 3: 좌우 분할 — 왼쪽 텍스트 / 오른쪽 대형 사진
+   ══════════════════════════════════════════ */
+.slide-portrait { padding: 0 !important; }
+
+.portrait-text-half {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 52%;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: flex-start;
+  padding: 7% 8% 7% 6%; text-align: left;
+}
+.portrait-overline {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.48rem, 0.88vw, 0.78rem);
+  letter-spacing: 0.22em; color: var(--green);
+  margin-bottom: 0.7em;
+  display: flex; align-items: center; gap: 0.5em;
+}
+.portrait-overline::before { content: '>'; animation: blink-cursor 1s step-end infinite; }
+.portrait-quote-mark {
+  font-size: clamp(2.5rem, 6vw, 5.5rem); color: var(--green);
+  opacity: 0.35; line-height: 0.75; font-family: Georgia, serif;
+  margin-bottom: 0.15em;
+}
+.portrait-quote {
+  font-size: clamp(1.1rem, 2.3vw, 2.1rem); font-weight: 700;
+  color: var(--white); line-height: 1.5;
+  word-break: keep-all; margin-bottom: 1em;
+}
+.portrait-sub {
+  font-size: clamp(0.6rem, 1.15vw, 1rem); color: var(--muted);
+  line-height: 1.65; margin-bottom: 1.5em;
+}
+.portrait-byline {
+  display: flex; align-items: center; gap: 0.8em;
+}
+.portrait-avatar {
+  width: clamp(32px, 4.5vw, 48px); height: clamp(32px, 4.5vw, 48px);
+  border-radius: 50%; overflow: hidden;
+  border: 2px solid var(--green-border); flex-shrink: 0;
+}
+.portrait-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.portrait-byline-text { display: flex; flex-direction: column; gap: 0.1em; }
+.portrait-name {
+  font-size: clamp(0.85rem, 1.6vw, 1.4rem); font-weight: 700; color: var(--white);
+  margin-top: 1.2em;
+}
+.portrait-title {
+  font-size: clamp(0.5rem, 0.9vw, 0.8rem); color: var(--green);
+  letter-spacing: 0.08em; margin-top: 0.25em;
+}
+
+.portrait-photo-half {
+  position: absolute; top: 0; left: 0; bottom: 0; width: 50%;
+}
+.portrait-photo-half img {
+  width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block;
+}
+.portrait-photo-half::before {
+  content: '';
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(to left, #000 0%, transparent 25%),
+              linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 40%);
+}
+.portrait-photo-half .photo-name-tag {
+  position: absolute; bottom: 6%; left: 6%; z-index: 2;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; padding: 0.4em 0.8em;
+  font-size: clamp(0.42rem, 0.78vw, 0.68rem);
+  color: rgba(255,255,255,0.55); backdrop-filter: blur(6px);
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar-container">
+  <div class="progress-bar-fill" id="progressFill" style="width:33.3%"></div>
+</div>
+<div class="hint" id="hint">← → 키 또는 스와이프 &nbsp;|&nbsp; F: 전체화면</div>
+
+<div class="stage" id="stage">
+  <div class="deck" id="deck">
+
+    <!-- ══ 1 / 3  풀블리드 배경 ══ -->
+    <section class="slide slide-fullbleed active" role="group" aria-label="1 / 3" tabindex="0">
+      <div class="slide-num">1 / 3</div>
+      <div class="bg-photo"></div>
+      <div class="overlay-gradient"></div>
+      <div class="content">
+        <div class="overline">글로벌 증명</div>
+        <h2>VSL 하나로<br>11조 원을<br>만들어낸 남자</h2>
+        <p class="sub">사브리 수비의 피드백 루프 전략이<br>수많은 비즈니스를 바꾼 이유</p>
+      </div>
+      <div class="photo-credit">Photo: Unsplash (placeholder)</div>
+    </section>
+
+    <!-- ══ 2 / 3  좌우 분할 인물사진 ══ -->
+    <section class="slide slide-split next" role="group" aria-label="2 / 3" tabindex="-1">
+      <div class="slide-num">2 / 3</div>
+      <div class="split-photo-half"></div>
+      <div class="split-text-half">
+        <div class="split-name-tag">Expert Reference</div>
+        <div class="split-person-name">알렉스 호르모지</div>
+        <div class="split-person-role">$100M Offers 저자 · Acquisition.com CEO</div>
+        <div class="split-divider-line"></div>
+        <p class="split-quote">
+          "완벽한 오퍼를 기다리지 마라.<br>
+          일단 던져서 시장이 원하는 걸 발견하라.<br>
+          그것이 유일한 수익화 공식이다."
+        </p>
+        <div class="split-stats">
+          <div class="split-stat-item">
+            <span class="split-stat-num">$100M+</span>
+            <span class="split-stat-desc">연매출 달성</span>
+          </div>
+          <div class="split-stat-item">
+            <span class="split-stat-num">4.8M</span>
+            <span class="split-stat-desc">유튜브 구독자</span>
+          </div>
+          <div class="split-stat-item">
+            <span class="split-stat-num">#1</span>
+            <span class="split-stat-desc">비즈니스 베스트셀러</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 3 / 3  좌우 분할 — 텍스트 + 대형 인물사진 ══ -->
+    <section class="slide slide-portrait next" role="group" aria-label="3 / 3" tabindex="-1">
+      <div class="slide-num">3 / 3</div>
+
+      <!-- 왼쪽: 인용 텍스트 -->
+      <div class="portrait-text-half">
+        <div class="portrait-overline">성공 사례</div>
+        <div class="portrait-quote-mark">"</div>
+        <p class="portrait-quote">
+          어글리 VSL로 먼저 던져라.<br>
+          시장이 당신의 스크립트를<br>써줄 것이다.
+        </p>
+        <p class="portrait-sub">
+          피드백 없이는 개선도 없다.<br>
+          완벽주의가 수익화를 막는 유일한 적이다.
+        </p>
+        <div class="portrait-name">사브리 수비</div>
+        <div class="portrait-title">VSL 마케팅 전문가 · $78억 달러 클라이언트 매출</div>
+      </div>
+
+      <!-- 오른쪽: 대형 사진 -->
+      <div class="portrait-photo-half">
+        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&q=85" alt="사브리 수비" />
+        <div class="photo-name-tag">Photo: Unsplash (placeholder)</div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<button class="nav-btn prev-btn" id="btnPrev" aria-label="이전">‹</button>
+<button class="nav-btn next-btn" id="btnNext" aria-label="다음">›</button>
+<div class="slide-counter" id="slideCounter">1 / 3</div>
+<nav class="thumbnail-nav" id="thumbnailNav"></nav>
+
+<script>
+'use strict';
+class Deck {
+  constructor() {
+    this.slides = Array.from(document.querySelectorAll('.slide'));
+    this.total  = this.slides.length;
+    this.idx    = 0; this.locked = false; this.DURATION = 450;
+    this._initDots(); this._initButtons(); this._initKeyboard(); this._initPointer();
+    this._updateUI();
+    const hint = document.getElementById('hint');
+    setTimeout(() => hint.classList.add('hidden'), 3500);
+  }
+  _initDots() {
+    const nav = document.getElementById('thumbnailNav');
+    this.dots = this.slides.map((_, i) => {
+      const b = document.createElement('button');
+      b.className = 'thumbnail-dot'; b.setAttribute('aria-label', `슬라이드 ${i+1}`);
+      b.addEventListener('click', () => this._goTo(i));
+      nav.appendChild(b); return b;
+    });
+  }
+  _initButtons() {
+    document.getElementById('btnPrev').addEventListener('click', () => this._go(-1));
+    document.getElementById('btnNext').addEventListener('click', () => this._go(1));
+  }
+  _initKeyboard() {
+    document.addEventListener('keydown', e => {
+      if (e.repeat) return;
+      let handled = false;
+      switch(e.key) {
+        case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': this._go(1); handled=true; break;
+        case 'ArrowLeft': case 'ArrowUp': case 'PageUp': this._go(-1); handled=true; break;
+        case 'Home': this._goTo(0); handled=true; break;
+        case 'End':  this._goTo(this.total-1); handled=true; break;
+        case 'f': case 'F':
+          if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+          else document.exitFullscreen().catch(()=>{}); handled=true; break;
+      }
+      if (handled) e.preventDefault();
+    });
+  }
+  _initPointer() {
+    const stage = document.getElementById('stage');
+    let sx=0, sy=0, st=0;
+    stage.addEventListener('pointerdown', e => { if(!e.isPrimary) return; sx=e.clientX; sy=e.clientY; st=Date.now(); stage.setPointerCapture(e.pointerId); });
+    stage.addEventListener('pointerup', e => { if(!e.isPrimary) return; const dx=e.clientX-sx, dy=e.clientY-sy, dt=Date.now()-st; if(dt<500 && Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)) this._go(dx<0?1:-1); });
+  }
+  _go(dir) { this._goTo(this.idx + dir); }
+  _goTo(n) {
+    if (this.locked) return;
+    n = Math.max(0, Math.min(this.total-1, n));
+    if (n === this.idx) return;
+    this.locked = true;
+    const prev = this.slides[this.idx], next = this.slides[n];
+    const dir = n > this.idx ? 1 : -1;
+    prev.classList.remove('active');
+    prev.classList.add(dir > 0 ? 'prev' : 'next');
+    next.classList.remove('prev','next');
+    next.classList.add('active');
+    this.idx = n; this._updateUI();
+    const unlock = () => { this.locked = false; };
+    next.addEventListener('transitionend', function h(e){ if(e.propertyName==='transform'){ next.removeEventListener('transitionend',h); unlock(); }});
+    setTimeout(unlock, this.DURATION + 50);
+  }
+  _updateUI() {
+    const n = this.idx+1, t = this.total;
+    document.getElementById('slideCounter').textContent = `${n} / ${t}`;
+    document.getElementById('progressFill').style.width = `${(n/t)*100}%`;
+    this.dots.forEach((d,i) => d.classList.toggle('active', i===this.idx));
+    document.getElementById('btnPrev').disabled = this.idx===0;
+    document.getElementById('btnNext').disabled = this.idx===this.total-1;
+  }
+}
+new Deck();
+</script>
+</body>
+</html>

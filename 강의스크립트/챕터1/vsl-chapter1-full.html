@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VSL 피드백 루프 전략 — 챕터 1 (전체)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #070b10; }
+body { font-family: 'Noto Sans KR', 'Inter', sans-serif; }
+
+/* ── TOKENS ── */
+:root {
+  --cyan: #00E5FF; --green: #00C875;
+  --green-dim: rgba(0,200,117,0.12); --green-border: rgba(0,200,117,0.3);
+  --yellow: #FFD600;
+  --white: #FFFFFF; --muted: rgba(255,255,255,0.45);
+  --card-bg: rgba(255,255,255,0.05); --card-border: rgba(255,255,255,0.1);
+  --red: #FF5555; --red-dim: rgba(255,85,85,0.1); --red-border: rgba(255,85,85,0.3);
+}
+
+/* ── PROGRESS BAR ── */
+.progress-bar-container { position: fixed; top: 0; left: 0; width: 100%; height: 3px; background: rgba(255,255,255,0.07); z-index: 200; }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, #0070F3, #00E5FF, #00C875); transition: width 0.35s ease; }
+
+/* ── STAGE ── */
+.stage { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; background: #070b10; overflow: hidden; }
+
+/* ── DECK ── */
+.deck {
+  aspect-ratio: 16/9;
+  width: min(100vw, 177.78vh);
+  position: relative; overflow: hidden;
+  background: #0a0e14;
+}
+.deck::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 55% 55% at 0% 0%,   rgba(0,200,117,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 55% at 100% 100%, rgba(0,229,255,0.07) 0%, transparent 60%);
+}
+
+/* ── SLIDE ── */
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center; text-align: center;
+  padding: 5% 8% 6%;
+  transition: transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.45s ease;
+  transform: translateX(100%); opacity: 0; pointer-events: none; user-select: none;
+  color: var(--white);
+}
+.slide > * { position: relative; z-index: 1; }
+.slide.active { transform: translateX(0%);   opacity: 1; pointer-events: auto; z-index: 1; }
+.slide.prev   { transform: translateX(-100%); opacity: 0; }
+.slide.next   { transform: translateX(100%);  opacity: 0; }
+.slide.no-transition { transition: none !important; }
+
+/* ── CROSS-FADE (같은 그룹 슬라이드 간 디졸브 전환) ── */
+.slide.xfade        { transition: opacity 0.55s ease !important; }
+.slide.xfade.active { transform: none; opacity: 1; }
+.slide.xfade.prev   { transform: none !important; opacity: 0; }
+.slide.xfade.next   { transform: none !important; opacity: 0; }
+
+/* ── SLIDE NUM ── */
+.slide-num { position: absolute; top: 4%; right: 4%; z-index: 2; font-family: 'Inter', sans-serif; font-size: clamp(9px,0.75vw,11px); color: rgba(255,255,255,0.18); font-variant-numeric: tabular-nums; }
+
+/* ── SECTION BADGE ── */
+.section-badge {
+  display: inline-flex; align-items: center; padding: 0.28em 1em;
+  border: 1px solid rgba(0,229,255,0.32); border-radius: 100px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.65rem, 1.1vw, 0.95rem);
+  letter-spacing: 0.14em; color: rgba(255,255,255,0.6);
+  background: rgba(0,229,255,0.04); margin-bottom: 0.8em;
+}
+
+/* ── TYPOGRAPHY ── */
+h2 {
+  font-size: clamp(1.6rem, 3.8vw, 3.8rem); font-weight: 700;
+  line-height: 1.15; letter-spacing: -0.02em; color: var(--white);
+  margin-bottom: 0.35em; word-break: keep-all;
+}
+.hl   { background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hl-b { color: var(--cyan); }
+.hl-y { color: var(--yellow); }
+.hl-r { color: var(--red); }
+.subtitle {
+  font-size: clamp(0.85rem, 1.55vw, 1.35rem); color: rgba(255,255,255,0.6);
+  line-height: 1.65; margin-bottom: 1.2em;
+}
+
+/* ── BUILD ── */
+[data-step] { opacity:0; transform:translateY(12px); transition:opacity .38s ease, transform .38s ease; visibility:hidden; }
+[data-step].visible { opacity:1; transform:translateY(0); visibility:visible; }
+
+/* ── CALLOUT ── */
+.callout {
+  width: 64%; padding: 0.9em 1.5em; border-radius: 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+  font-size: clamp(0.75rem, 1.25vw, 1.1rem); color: rgba(255,255,255,0.72);
+  line-height: 1.65; text-align: left; margin-top: 4%; word-break: keep-all;
+}
+.callout.warning { border-color: var(--red-border); background: var(--red-dim); }
+
+/* ── CITATION ── */
+.citation { width: 58%; margin-top: 3.5%; padding: 0.85em 1.5em; border-left: 3px solid var(--cyan); text-align: left; }
+.citation-text { font-size: clamp(0.82rem, 1.4vw, 1.22rem); color: rgba(255,255,255,0.82); line-height: 1.65; font-style: italic; }
+.citation-attr  { font-size: clamp(0.62rem, 1vw, 0.88rem); color: var(--muted); margin-top: 0.55em; font-style: normal; }
+
+aside.speaker-notes { display: none; }
+
+/* ── UI ── */
+.slide-counter { position: fixed; bottom: 16px; right: 20px; font-family: 'Inter', sans-serif; font-size: 11px; letter-spacing: 0.1em; color: rgba(255,255,255,0.2); user-select: none; z-index: 150; }
+.thumbnail-nav { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 150; }
+.thumbnail-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.18); border: none; cursor: pointer; transition: background 0.25s, transform 0.25s; }
+.thumbnail-dot.active { background: var(--green); transform: scale(1.55); }
+.nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.2); width: 34px; height: 34px; border-radius: 50%; font-size: 18px; cursor: pointer; z-index: 150; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s; }
+.nav-btn:hover { background: rgba(0,229,255,0.08); color: var(--cyan); }
+.nav-btn.prev-btn { left: 12px; }
+.nav-btn.next-btn { right: 12px; }
+.nav-btn:disabled { opacity: 0.08; cursor: default; }
+.hint { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(10,14,20,0.88); color: rgba(255,255,255,0.32); font-family: 'Inter', sans-serif; font-size: 11px; padding: 5px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); z-index: 200; pointer-events: none; transition: opacity 1s ease; white-space: nowrap; }
+.hint.hidden { opacity: 0; }
+
+/* ════════════════════════════════════
+   COMPONENTS
+   ════════════════════════════════════ */
+
+/* ── Equation + Cards ── */
+.eq-cards { display: flex; align-items: center; gap: 1.2%; width: 86%; margin-top: 1.5%; }
+.eq-card {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.55em;
+  padding: 1.3em 0.9em; background: var(--card-bg); border: 1px solid var(--card-border);
+  border-radius: 12px; text-align: center;
+}
+.eq-card-icon  { font-size: clamp(1.8rem, 3.2vw, 3rem); line-height: 1; }
+.eq-card-title { font-size: clamp(0.9rem, 1.7vw, 1.5rem); font-weight: 700; color: var(--white); line-height: 1.3; }
+.eq-card-desc  { font-size: clamp(0.7rem, 1.1vw, 0.95rem); color: var(--muted); line-height: 1.55; }
+.eq-arrow { color: var(--green); font-size: clamp(1.2rem, 2.2vw, 2rem); flex-shrink: 0; }
+
+/* ── VS Card ── */
+.vs-grid { display: flex; gap: 1.8%; width: 82%; margin-top: 1.5%; }
+.vs-card {
+  flex: 1; display: flex; flex-direction: column; gap: 0.7em;
+  padding: 1.6em 1.6em; background: var(--card-bg);
+  border: 1px solid var(--card-border); border-radius: 14px; text-align: center;
+}
+.vs-card.green-card { border-color: var(--green-border); background: var(--green-dim); }
+.vs-card.red-card   { border-color: var(--red-border);   background: var(--red-dim); }
+.vs-card-label { font-family: 'JetBrains Mono', monospace; font-size: clamp(0.62rem, 0.95vw, 0.82rem); letter-spacing: 0.14em; color: var(--muted); }
+.vs-card-icon {
+  width: clamp(42px, 5.5vw, 62px); height: clamp(42px, 5.5vw, 62px);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: clamp(1rem, 1.9vw, 1.7rem); font-weight: 700; align-self: center;
+}
+.vs-card-icon.muted { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.35); border: 1.5px solid rgba(255,255,255,0.1); }
+.vs-card-icon.ok    { background: var(--green); color: #000; }
+.vs-card-icon.bad   { background: var(--red);   color: #fff; }
+.vs-card-title { font-size: clamp(1rem, 1.9vw, 1.65rem); font-weight: 700; }
+.vs-card-body  { font-size: clamp(0.72rem, 1.2vw, 1.05rem); color: var(--muted); line-height: 1.6; }
+.vs-card-result { font-size: clamp(0.88rem, 1.5vw, 1.3rem); font-weight: 700; line-height: 1.4; }
+
+/* ── Quote Block ── */
+.quote-block { display: flex; flex-direction: column; align-items: center; gap: 0.5em; max-width: 68%; margin-top: 1.8%; }
+.quote-mark   { font-size: clamp(3rem, 6vw, 5.5rem); color: var(--green); line-height: 0.8; opacity: 0.5; font-family: Georgia, serif; }
+.quote-text   { font-size: clamp(1rem, 2vw, 1.8rem); font-weight: 700; color: var(--white); text-align: center; line-height: 1.55; word-break: keep-all; }
+.quote-author { font-size: clamp(0.78rem, 1.4vw, 1.2rem); color: var(--green); font-weight: 700; margin-top: 0.5em; }
+.quote-role   { font-size: clamp(0.6rem, 1vw, 0.88rem); color: var(--muted); }
+
+/* ── Stat Block ── */
+.stat-block { display: flex; flex-direction: column; align-items: center; gap: 0.25em; }
+.stat-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: clamp(0.72rem, 1.1vw, 0.95rem); letter-spacing: 0.16em; color: var(--muted); margin-bottom: 0.4em; }
+.stat-number {
+  font-size: clamp(4rem, 10vw, 9.5rem); font-weight: 900; line-height: 1;
+  letter-spacing: -0.03em;
+  background: linear-gradient(90deg, var(--cyan), var(--green));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.stat-number.red {
+  background: linear-gradient(90deg, #FF5555, #FF8888);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.stat-unit    { font-size: clamp(1rem, 2.2vw, 2rem); color: var(--muted); margin-top: -0.1em; }
+.stat-desc    { font-size: clamp(0.85rem, 1.7vw, 1.55rem); font-weight: 700; color: var(--white); margin-top: 0.6em; }
+.stat-context { font-size: clamp(0.78rem, 1.3vw, 1.12rem); color: var(--muted); margin-top: 0.25em; }
+
+/* ── Horizontal Flow ── */
+.hflow { display: flex; align-items: center; gap: 0.6%; width: 88%; margin-top: 1.5%; }
+.hflow-step {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.4em;
+  padding: 1em 0.6em; background: var(--card-bg);
+  border: 1px solid var(--card-border); border-radius: 10px; text-align: center;
+}
+.hflow-step.active { border-color: var(--green-border); background: var(--green-dim); }
+.hflow-num   { font-size: clamp(0.72rem, 1.2vw, 1.05rem); font-weight: 700; color: var(--cyan); font-family: 'Inter', sans-serif; letter-spacing: 0.06em; }
+.hflow-icon  { font-size: clamp(1.8rem, 3.2vw, 3rem); line-height: 1; }
+.hflow-title { font-size: clamp(0.92rem, 1.7vw, 1.5rem); font-weight: 700; color: var(--white); line-height: 1.3; }
+.hflow-sub   { font-size: clamp(0.68rem, 1.1vw, 0.95rem); color: var(--muted); line-height: 1.45; }
+.hflow-arrow { color: var(--green); font-size: clamp(1rem, 1.8vw, 1.6rem); flex-shrink: 0; }
+
+/* ── Before / After ── */
+.ba-container { display: flex; width: 74%; min-height: 42%; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); margin-top: 2%; }
+.ba-panel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2em 2em; gap: 0.65em; }
+.ba-before { background: rgba(255,255,255,0.03); }
+.ba-after  { background: var(--green-dim); }
+.ba-after.danger { background: var(--red-dim); }
+.ba-divider { width: 1px; background: rgba(255,255,255,0.1); flex-shrink: 0; }
+.ba-tag   { font-size: clamp(0.68rem, 1.1vw, 0.95rem); letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; }
+.ba-before .ba-tag { color: rgba(255,255,255,0.22); }
+.ba-after  .ba-tag { color: var(--green); }
+.ba-after.danger .ba-tag { color: var(--red); }
+.ba-icon  { width: clamp(42px,5.5vw,62px); height: clamp(42px,5.5vw,62px); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: clamp(1rem,1.8vw,1.6rem); font-weight: 700; }
+.ba-before .ba-icon { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.32); border: 1.5px solid rgba(255,255,255,0.1); }
+.ba-after  .ba-icon { background: var(--green); color: #000; }
+.ba-after.danger .ba-icon { background: var(--red); color: #fff; }
+.ba-label { font-size: clamp(0.88rem, 1.6vw, 1.4rem); font-weight: 700; }
+.ba-before .ba-label { color: rgba(255,255,255,0.38); }
+.ba-after  .ba-label { color: var(--green); }
+.ba-after.danger .ba-label { color: var(--red); }
+.ba-desc  { font-size: clamp(0.72rem, 1.2vw, 1.05rem); color: var(--muted); text-align: center; line-height: 1.6; }
+
+/* ── Feature List ── */
+.feature-list { display: flex; flex-direction: column; gap: 1em; width: 62%; margin-top: 1.8%; }
+.feature-item { display: flex; align-items: flex-start; gap: 1em; text-align: left; }
+.feature-icon { width: clamp(36px,4.5vw,52px); height: clamp(36px,4.5vw,52px); border-radius: 10px; background: var(--green-dim); border: 1px solid var(--green-border); font-size: clamp(1rem,1.6vw,1.4rem); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.feature-title { font-size: clamp(0.88rem, 1.5vw, 1.3rem); font-weight: 700; color: var(--white); }
+.feature-sub   { font-size: clamp(0.68rem, 1.1vw, 0.95rem); color: var(--muted); margin-top: 0.2em; line-height: 1.55; }
+
+/* ── Timeline ── */
+.timeline { display: flex; align-items: flex-start; width: 90%; margin-top: 2.5%; gap: 0; }
+.tl-node  { display: flex; flex-direction: column; align-items: center; gap: 0.55em; flex: 1; }
+.tl-connector { display: flex; align-items: center; flex: 0.6; margin-top: clamp(10px,1.5vw,18px); }
+.tl-line  { flex: 1; height: 2px; background: rgba(255,255,255,0.12); }
+.tl-dot   { width: clamp(12px,1.6vw,20px); height: clamp(12px,1.6vw,20px); border-radius: 50%; background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; transition: all .3s; }
+.tl-dot.on { background: var(--green); border-color: var(--green); box-shadow: 0 0 14px rgba(0,200,117,0.55); }
+.tl-time  { font-size: clamp(1rem, 2vw, 1.85rem); font-weight: 900; color: rgba(255,255,255,0.25); font-family: 'Inter', sans-serif; letter-spacing: -0.02em; transition: color .3s; }
+.tl-time.on { color: var(--green); }
+.tl-label { font-size: clamp(0.6rem, 1vw, 0.88rem); color: var(--muted); line-height: 1.4; }
+.tl-label.on { color: rgba(255,255,255,0.8); }
+.tl-star  { font-size: clamp(0.6rem, 0.95vw, 0.82rem); color: var(--yellow); margin-top: 0.1em; font-weight: 700; }
+
+/* ── 4-Step Loop Indicator ── */
+.loop4 { display: flex; align-items: center; gap: 0.5%; width: 80%; margin-top: 1%; }
+.loop4-step {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2em;
+  padding: 0.5em 0.4em; background: var(--card-bg);
+  border: 1px solid var(--card-border); border-radius: 8px; text-align: center;
+  opacity: 0.35; transition: opacity .3s, border-color .3s, background .3s;
+}
+.loop4-step.on { border-color: var(--green-border); background: var(--green-dim); opacity: 1; }
+.loop4-num   { font-size: clamp(0.48rem, 0.78vw, 0.65rem); font-weight: 700; color: var(--cyan); font-family: 'Inter', sans-serif; letter-spacing: 0.08em; }
+.loop4-icon  { font-size: clamp(1rem, 1.8vw, 1.6rem); line-height: 1; }
+.loop4-title { font-size: clamp(0.6rem, 1vw, 0.88rem); font-weight: 700; color: var(--white); }
+.loop4-arrow { color: rgba(0,200,117,0.35); font-size: clamp(0.7rem, 1.1vw, 0.95rem); flex-shrink: 0; }
+
+/* ── Step Focus Card ── */
+.step-focus {
+  width: 66%; margin-top: 2%;
+  padding: 1.4em 1.8em; border-radius: 14px;
+  background: var(--green-dim); border: 1px solid var(--green-border);
+  text-align: left;
+}
+.step-focus-tag   { font-family: 'JetBrains Mono', monospace; font-size: clamp(0.62rem, 0.95vw, 0.82rem); color: var(--green); letter-spacing: 0.14em; margin-bottom: 0.4em; }
+.step-focus-title { font-size: clamp(1.1rem, 2.2vw, 2rem); font-weight: 700; color: var(--white); margin-bottom: 0.4em; line-height: 1.2; }
+.step-focus-body  { font-size: clamp(0.72rem, 1.2vw, 1.05rem); color: rgba(255,255,255,0.72); line-height: 1.7; }
+
+/* ── Step Cards (summary) ── */
+.step-cards { display: flex; flex-direction: column; gap: 0.85em; width: 62%; margin-top: 1.5%; }
+.step-card  { display: flex; align-items: center; gap: 1.2em; padding: 0.95em 1.4em; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; text-align: left; }
+.step-card-num   { font-size: clamp(1.4rem, 2.8vw, 2.5rem); font-weight: 900; color: var(--green); font-family: 'Inter', sans-serif; min-width: 1.5em; text-align: center; line-height: 1; }
+.step-card-title { font-size: clamp(0.92rem, 1.6vw, 1.4rem); font-weight: 700; color: var(--white); }
+.step-card-desc  { font-size: clamp(0.68rem, 1.1vw, 0.95rem); color: var(--muted); margin-top: 0.2em; }
+
+/* ── Big Warning ── */
+.big-warning { font-size: clamp(1.8rem, 4.2vw, 4rem); font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; word-break: keep-all; margin-bottom: 0.35em; }
+</style>
+</head>
+<body>
+
+<div class="progress-bar-container"><div class="progress-bar-fill" id="progressFill"></div></div>
+<div class="hint" id="hint">← → 키 또는 스와이프 &nbsp;|&nbsp; F: 전체화면</div>
+
+<div class="stage" id="stage">
+  <div class="deck" id="deck">
+
+    <!-- ══ 1 / 23  챕터 예고 — Eq+Cards ══ -->
+    <section class="slide active" role="group" aria-label="1 / 23" tabindex="0">
+      <div class="slide-num">1 / 23</div>
+      <div class="section-badge">챕터 1 · 피드백 루프 전략</div>
+      <h2>이번 챕터에서 <span class="hl">배울 것</span></h2>
+      <p class="subtitle">강의를 돈으로 바꾸는 3단계 전략</p>
+      <div class="eq-cards">
+        <div class="eq-card" data-step="1">
+          <div class="eq-card-icon">🧠</div>
+          <div class="eq-card-title">완벽주의 마인드셋 제거</div>
+          <div class="eq-card-desc">시작을 막는 함정에서<br>벗어나는 첫 번째 조건</div>
+        </div>
+        <div class="eq-arrow" data-step="2">→</div>
+        <div class="eq-card" data-step="2">
+          <div class="eq-card-icon">🔄</div>
+          <div class="eq-card-title">피드백 루프 구축</div>
+          <div class="eq-card-desc">어글리 런칭 → 반응 수집<br>→ 고도화 사이클 반복</div>
+        </div>
+        <div class="eq-arrow" data-step="3">→</div>
+        <div class="eq-card" data-step="3">
+          <div class="eq-card-icon">👑</div>
+          <div class="eq-card-title">나만의 옷 입히기</div>
+          <div class="eq-card-desc">검증 후 글로벌 고수 전략<br>나만의 색깔로 적용</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 2 / 23  오프닝 — Title + Citation ══ -->
+    <section class="slide next" role="group" aria-label="2 / 23" tabindex="-1">
+      <div class="slide-num">2 / 23</div>
+      <div class="section-badge">오프닝</div>
+      <h2>피드백 루프<span class="hl">(Feedback Loop)</span> 전략</h2>
+      <p class="subtitle">이 강의를 300%로 흡수하는 3단계 학습법</p>
+      <div class="citation">
+        <div class="citation-text">지식만 쌓아두고 성과를 내지 못하는 함정 —<br>지금부터 그것을 피하는 방법을 말씀드립니다.</div>
+      </div>
+    </section>
+
+    <!-- ══ 3 / 23  완벽주의 함정 — Citation + Warning ══ -->
+    <section class="slide next" role="group" aria-label="3 / 23" tabindex="-1">
+      <div class="slide-num">3 / 23</div>
+      <div class="section-badge">위험한 함정</div>
+      <h2>완벽하게 준비된 후에 <span class="hl-r">시작?</span></h2>
+      <p class="subtitle">실패하는 사람들의 단 하나의 공통점</p>
+      <div class="citation" data-step="1">
+        <div class="citation-text">"영상미도, 스크립트도, 디자인도<br>완벽해야만 시작하겠다."</div>
+        <div class="citation-attr">결코 시작하지 못하는 사람들의 공통 신념</div>
+      </div>
+      <div class="callout warning" data-step="2">⚠️ 이것이 가장 위험한 마인드셋입니다. 첫 발을 막는 것은 실력 부족이 아니라 이 집착입니다.</div>
+    </section>
+
+    <!-- ══ 4 / 23  Before/After — VS Card ══ -->
+    <section class="slide next" role="group" aria-label="4 / 23" tabindex="-1">
+      <div class="slide-num">4 / 23</div>
+      <div class="section-badge">완벽주의 vs 실행</div>
+      <h2>같은 출발선, <span class="hl">1년 후</span>의 결과</h2>
+      <div class="vs-grid">
+        <div class="vs-card red-card" data-step="1">
+          <div class="vs-card-label">완벽주의자</div>
+          <div class="vs-card-icon bad">✕</div>
+          <div class="vs-card-title" style="color:var(--red)">아직 런칭 못 함</div>
+          <div class="vs-card-body">영상미, 스크립트, 디자인<br>완벽히 준비한 뒤 시작하겠다</div>
+          <div class="vs-card-result" style="color:var(--red)">→ 1년 후에도 준비 중</div>
+        </div>
+        <div class="vs-card green-card" data-step="2">
+          <div class="vs-card-label">즉시 실행자</div>
+          <div class="vs-card-icon ok">✓</div>
+          <div class="vs-card-title" style="color:var(--green)">월 수백만 원 매출</div>
+          <div class="vs-card-body">어설픈 영상으로 시작해<br>피드백을 반영하며 고도화</div>
+          <div class="vs-card-result" style="color:var(--green)">→ 수익화 성공 궤도</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 5 / 23  사브리 수비 소개 — Quote ══ -->
+    <section class="slide next" role="group" aria-label="5 / 23" tabindex="-1">
+      <div class="slide-num">5 / 23</div>
+      <div class="section-badge">글로벌 증명</div>
+      <h2>세계가 인정한 <span class="hl">VSL의 힘</span></h2>
+      <div class="quote-block">
+        <div class="quote-mark">"</div>
+        <div class="quote-text">VSL 마케팅 하나로 수십 개 산업군의<br>비즈니스 매출을 끌어올렸다</div>
+        <div class="quote-author">Sabri Suby</div>
+        <div class="quote-role">King Kong Agency CEO · 글로벌 마케터</div>
+      </div>
+      <div class="citation" style="margin-top:3%; align-self:center; text-align:center; border-left:none; border-top:1px solid rgba(0,229,255,0.2); padding:1em 0 0;">
+        <div class="citation-text" style="font-size:clamp(0.72rem,1.15vw,1rem); color:var(--muted);">그가 클라이언트들과 함께 만들어낸 숫자 — 다음 슬라이드에서 확인하세요.</div>
+      </div>
+    </section>
+
+    <!-- ══ 6 / 23  $78억 — Stat Callout ══ -->
+    <section class="slide next" role="group" aria-label="6 / 23" tabindex="-1">
+      <div class="slide-num">6 / 23</div>
+      <div class="section-badge">글로벌 증명</div>
+      <div class="stat-block">
+        <div class="stat-eyebrow">사브리 수비 클라이언트 누적 매출</div>
+        <div class="stat-number">$78억</div>
+        <div class="stat-unit">달러 (한화 약 11조 원+)</div>
+        <div class="stat-desc">수십 개 산업군에서 동일하게 통한 결과</div>
+        <div class="stat-context">잘 기획된 VSL 하나의 힘이 이것이다</div>
+      </div>
+    </section>
+
+    <!-- ══ 7 / 23  3단계 마스터플랜 — Horizontal Flow ══ -->
+    <section class="slide next" role="group" aria-label="7 / 23" tabindex="-1">
+      <div class="slide-num">7 / 23</div>
+      <div class="section-badge">3단계 마스터플랜</div>
+      <h2>글로벌 고수들의 <span class="hl">공통된 3단계</span></h2>
+      <p class="subtitle">이 순서를 반드시 지켜야 합니다</p>
+      <div class="hflow">
+        <div class="hflow-step" data-step="1">
+          <div class="hflow-num">STEP 01</div>
+          <div class="hflow-icon">🛫</div>
+          <div class="hflow-title">어글리 VSL 런칭</div>
+          <div class="hflow-sub">완벽주의 버리고<br>빠르게 시장에 던지기</div>
+        </div>
+        <div class="hflow-arrow" data-step="2">→</div>
+        <div class="hflow-step" data-step="2">
+          <div class="hflow-num">STEP 02</div>
+          <div class="hflow-icon">🔄</div>
+          <div class="hflow-title">피드백 고도화</div>
+          <div class="hflow-sub">고객 반응 바탕으로<br>VSL 다듬고 반복</div>
+        </div>
+        <div class="hflow-arrow" data-step="3">→</div>
+        <div class="hflow-step active" data-step="3">
+          <div class="hflow-num">STEP 03</div>
+          <div class="hflow-icon">👑</div>
+          <div class="hflow-title">나만의 옷 입히기</div>
+          <div class="hflow-sub">검증 후 고수 전략을<br>나만의 색깔로 적용</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 8 / 23  절대 조건 — Before/After ══ -->
+    <section class="slide next" role="group" aria-label="8 / 23" tabindex="-1">
+      <div class="slide-num">8 / 23</div>
+      <div class="section-badge">단 하나의 절대 조건</div>
+      <h2>화면은 거칠어도, <span class="hl">오디오는 완벽</span>해야 한다</h2>
+      <div class="ba-container">
+        <div class="ba-panel ba-before" data-step="1">
+          <div class="ba-tag">화질</div>
+          <div class="ba-icon">△</div>
+          <div class="ba-label">투박해도 OK</div>
+          <div class="ba-desc">시청자가 어느 정도 참아준다<br>첫 단계에서 완벽할 필요 없음</div>
+        </div>
+        <div class="ba-divider"></div>
+        <div class="ba-panel ba-after danger" data-step="2">
+          <div class="ba-tag">오디오</div>
+          <div class="ba-icon">!</div>
+          <div class="ba-label">절대 타협 불가</div>
+          <div class="ba-desc">품질 저하 시 이탈률이<br>즉시 치솟는다 — 수치로 확인하세요</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 9 / 23  55% 이탈 — Stat (red) ══ -->
+    <section class="slide next" role="group" aria-label="9 / 23" tabindex="-1">
+      <div class="slide-num">9 / 23</div>
+      <div class="section-badge">이탈률 데이터</div>
+      <div class="stat-block">
+        <div class="stat-eyebrow">비디오 마케팅 통계 · 오디오 품질 저하 시</div>
+        <div class="stat-number red">55%</div>
+        <div class="stat-unit">첫 60초 이내 이탈 확률 상승</div>
+        <div class="stat-desc">화질이 나빠도 참지만, 소리가 나쁘면 떠난다</div>
+      </div>
+      <div class="callout warning" data-step="1">⚠️ 어글리 VSL이어도 소리만큼은 절대 타협하지 마세요. 마이크 하나가 전환율을 결정합니다.</div>
+    </section>
+
+    <!-- ══ 10 / 23  마이크 투자 — Feature List ══ -->
+    <section class="slide next" role="group" aria-label="10 / 23" tabindex="-1">
+      <div class="slide-num">10 / 23</div>
+      <div class="section-badge">오디오 투자</div>
+      <h2>마이크 하나로 <span class="hl">전환율이 달라진다</span></h2>
+      <p class="subtitle">첫 장비 투자처를 딱 하나만 고른다면</p>
+      <div class="feature-list">
+        <div class="feature-item" data-step="1">
+          <div class="feature-icon">🎙️</div>
+          <div>
+            <div class="feature-title">Shure MV7 추천</div>
+            <div class="feature-sub">강사 본인이 직접 사용하는 마이크 — 가격대가 있지만 퀄리티가 다르다</div>
+          </div>
+        </div>
+        <div class="feature-item" data-step="2">
+          <div class="feature-icon">🤝</div>
+          <div>
+            <div class="feature-title">오디오 품질 = 강사의 신뢰감</div>
+            <div class="feature-sub">선명한 목소리는 콘텐츠 신뢰도를 높이고 시청 지속률을 올린다</div>
+          </div>
+        </div>
+        <div class="feature-item" data-step="3">
+          <div class="feature-icon">💰</div>
+          <div>
+            <div class="feature-title">장비 중 ROI가 가장 높은 투자처</div>
+            <div class="feature-sub">카메라, 조명보다 마이크가 먼저다 — 이것이 전환율과 직결된다</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 11 / 23  고파사 8년 타임라인 ══ -->
+    <section class="slide next" role="group" aria-label="11 / 23" tabindex="-1">
+      <div class="slide-num">11 / 23</div>
+      <div class="section-badge">강사의 실제 여정</div>
+      <h2>고파사의 <span class="hl">8년 타임라인</span></h2>
+      <p class="subtitle">3분짜리 어글리 VSL에서 40분 황금 시간까지</p>
+      <div class="timeline">
+        <div class="tl-node" data-step="1">
+          <div class="tl-dot on"></div>
+          <div class="tl-time on">3분</div>
+          <div class="tl-label on">첫 번째<br>어글리 VSL</div>
+        </div>
+        <div class="tl-connector" data-step="2"><div class="tl-line"></div></div>
+        <div class="tl-node" data-step="2">
+          <div class="tl-dot on"></div>
+          <div class="tl-time on">10분</div>
+          <div class="tl-label on">반응 보며<br>첫 확장</div>
+        </div>
+        <div class="tl-connector" data-step="3"><div class="tl-line"></div></div>
+        <div class="tl-node" data-step="3">
+          <div class="tl-dot on"></div>
+          <div class="tl-time on">20분</div>
+          <div class="tl-label on">피드백<br>고도화</div>
+        </div>
+        <div class="tl-connector" data-step="4"><div class="tl-line"></div></div>
+        <div class="tl-node" data-step="4">
+          <div class="tl-dot on"></div>
+          <div class="tl-time on">30분</div>
+          <div class="tl-label on">설득 구조<br>정교화</div>
+        </div>
+        <div class="tl-connector" data-step="5"><div class="tl-line"></div></div>
+        <div class="tl-node" data-step="5">
+          <div class="tl-dot on"></div>
+          <div class="tl-time on">40분</div>
+          <div class="tl-label on">황금 시간<br>발견</div>
+          <div class="tl-star">★ 최적</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 12 / 23  40분 이유 ══ -->
+    <section class="slide next" role="group" aria-label="12 / 23" tabindex="-1">
+      <div class="slide-num">12 / 23</div>
+      <div class="section-badge">황금 시간의 비밀</div>
+      <h2>왜 <span class="hl">'40분'</span>이 황금 시간인가?</h2>
+      <p class="subtitle">고가 결제를 이끄는 심리적 활주로(Runway)</p>
+      <div class="citation">
+        <div class="citation-text">30분 이하는 정보 전달엔 좋습니다. 하지만 고객의 뿌리 깊은 편견을 깨고, 수백만 원의 결제를 이끌어내는 '심리적 설득'을 완수하기엔 물리적으로 시간이 부족합니다.</div>
+      </div>
+      <div class="citation" style="margin-top:1.5%;">
+        <div class="citation-text">40분은 고객이 이야기에 완전히 몰입해 <strong style="color:var(--cyan)">"이거다!"</strong> 확신을 갖고 이륙하기에 최적화된 심리적 활주로의 길이입니다.</div>
+        <div class="citation-attr">해외 탑티어 마케터 VSL 평균 길이: 40분~1시간</div>
+      </div>
+    </section>
+
+    <!-- ══ 13 / 23  30분 vs 40분 — VS Card ══ -->
+    <section class="slide next" role="group" aria-label="13 / 23" tabindex="-1">
+      <div class="slide-num">13 / 23</div>
+      <div class="section-badge">설득의 깊이 비교</div>
+      <h2>30분 이하 vs <span class="hl">40분 이상</span></h2>
+      <p class="subtitle">길이가 다르면 고객의 확신도 달라진다</p>
+      <div class="vs-grid">
+        <div class="vs-card red-card" data-step="1">
+          <div class="vs-card-label">30분 이하</div>
+          <div class="vs-card-icon muted">⏱</div>
+          <div class="vs-card-title" style="color:rgba(255,255,255,0.5)">정보 전달엔 OK</div>
+          <div class="vs-card-body">고객의 의심을 풀고<br>가치를 납득시키기엔<br>시간이 절대적으로 부족</div>
+          <div class="vs-card-result" style="color:var(--red)">→ CTA 앞에서 망설임</div>
+        </div>
+        <div class="vs-card green-card" data-step="2">
+          <div class="vs-card-label">40분 이상</div>
+          <div class="vs-card-icon ok">✓</div>
+          <div class="vs-card-title" style="color:var(--green)">심리적 설득 완성</div>
+          <div class="vs-card-body">끝까지 본 고객은<br>이미 절반은 설득된 상태로<br>CTA 버튼 앞에 선다</div>
+          <div class="vs-card-result" style="color:var(--green)">→ 확신을 갖고 결제</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 14 / 23  1단계 실행 — Feature List ══ -->
+    <section class="slide next" role="group" aria-label="14 / 23" tabindex="-1">
+      <div class="slide-num">14 / 23</div>
+      <div class="section-badge">1단계 실행</div>
+      <h2><span class="hl">1단계:</span> 템플릿으로 런칭 & 사이클 돌리기</h2>
+      <p class="subtitle">완벽함을 포기하고, 시장의 반응을 얻어라</p>
+      <div class="feature-list">
+        <div class="feature-item" data-step="1">
+          <div class="feature-icon">📋</div>
+          <div>
+            <div class="feature-title">고파사 VSL 마스터 템플릿 활용</div>
+            <div class="feature-sub">템플릿으로 어글리 VSL을 만들고 바로 런칭 — 디자인은 최소한으로만</div>
+          </div>
+        </div>
+        <div class="feature-item" data-step="2">
+          <div class="feature-icon">📡</div>
+          <div>
+            <div class="feature-title">고객 반응 관찰</div>
+            <div class="feature-sub">문의가 오는지, 결제가 일어나는지 — 느낌이 아닌 숫자로 판단</div>
+          </div>
+        </div>
+        <div class="feature-item" data-step="3">
+          <div class="feature-icon">🔁</div>
+          <div>
+            <div class="feature-title">피드백 수집이 1단계의 전부</div>
+            <div class="feature-sub">부족한 부분을 데이터로 확인하는 것, 이것이 사이클의 출발점</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 15 / 23  호르모지 루프 개요 — Quote + 4단계 ══ -->
+    <section class="slide next" role="group" aria-label="15 / 23" tabindex="-1">
+      <div class="slide-num">15 / 23</div>
+      <div class="section-badge">글로벌 검증</div>
+      <h2>알렉스 호르모지의 <span class="hl">수익화 피드백 루프</span></h2>
+      <div class="quote-block">
+        <div class="quote-mark">"</div>
+        <div class="quote-text">세계 최고의 마케터도 이 루프를 반복한다.<br>한 번에 완성되는 VSL은 없다.</div>
+        <div class="quote-author">Alex Hormozi</div>
+        <div class="quote-role">$100M Offers 저자 · 글로벌 마케터</div>
+      </div>
+      <div class="loop4" style="margin-top:3%;">
+        <div class="loop4-step on">
+          <div class="loop4-num">STEP 01</div>
+          <div class="loop4-icon">📢</div>
+          <div class="loop4-title">Ads</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step on">
+          <div class="loop4-num">STEP 02</div>
+          <div class="loop4-icon">👁</div>
+          <div class="loop4-title">Action</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step on">
+          <div class="loop4-num">STEP 03</div>
+          <div class="loop4-icon">✍️</div>
+          <div class="loop4-title">Better Copy</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step on">
+          <div class="loop4-num">STEP 04</div>
+          <div class="loop4-icon">🔁</div>
+          <div class="loop4-title">Repeat</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 16 / 23  루프 Step 1 — Ads ══ -->
+    <section class="slide next" data-xgroup="loop" role="group" aria-label="16 / 23" tabindex="-1">
+      <div class="slide-num">16 / 23</div>
+      <div class="section-badge">피드백 루프</div>
+      <h2>Step 1. 어글리 VSL로 <span class="hl">광고 시작</span></h2>
+      <div class="loop4" style="margin-top:1.2%;">
+        <div class="loop4-step on">
+          <div class="loop4-num">STEP 01</div>
+          <div class="loop4-icon">📢</div>
+          <div class="loop4-title">Ads</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 02</div>
+          <div class="loop4-icon">👁</div>
+          <div class="loop4-title">Action</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 03</div>
+          <div class="loop4-icon">✍️</div>
+          <div class="loop4-title">Better Copy</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 04</div>
+          <div class="loop4-icon">🔁</div>
+          <div class="loop4-title">Repeat</div>
+        </div>
+      </div>
+      <div class="step-focus">
+        <div class="step-focus-tag">STEP 01 · ADS</div>
+        <div class="step-focus-title">완벽하지 않아도, 일단 돌린다</div>
+        <div class="step-focus-body">만들어진 어글리 VSL 그대로 광고를 시작합니다. 완성도를 높이려고 기다리지 마세요. 시장에 던지지 않으면 아무런 데이터도 얻을 수 없습니다. 지금 가진 것으로 일단 시작하는 것, 이것이 루프의 출발점입니다.</div>
+      </div>
+    </section>
+
+    <!-- ══ 17 / 23  루프 Step 2 — Action ══ -->
+    <section class="slide next" data-xgroup="loop" role="group" aria-label="17 / 23" tabindex="-1">
+      <div class="slide-num">17 / 23</div>
+      <div class="section-badge">피드백 루프</div>
+      <h2>Step 2. <span class="hl">고객 반응 확인</span> (Action)</h2>
+      <div class="loop4" style="margin-top:1.2%;">
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 01</div>
+          <div class="loop4-icon">📢</div>
+          <div class="loop4-title">Ads</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step on">
+          <div class="loop4-num">STEP 02</div>
+          <div class="loop4-icon">👁</div>
+          <div class="loop4-title">Action</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 03</div>
+          <div class="loop4-icon">✍️</div>
+          <div class="loop4-title">Better Copy</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 04</div>
+          <div class="loop4-icon">🔁</div>
+          <div class="loop4-title">Repeat</div>
+        </div>
+      </div>
+      <div class="step-focus">
+        <div class="step-focus-tag">STEP 02 · ACTION</div>
+        <div class="step-focus-title">클릭했는가, 문의했는가, 결제했는가</div>
+        <div class="step-focus-body">광고를 돌린 후엔 고객의 행동을 관찰합니다. 영상을 끝까지 봤는지, 문의가 왔는지, 실제 결제가 일어났는지. 이 반응 데이터가 다음 개선 방향을 결정합니다. 느낌이 아닌 숫자로 판단하세요.</div>
+      </div>
+    </section>
+
+    <!-- ══ 18 / 23  루프 Step 3 — Better Copy & Offer ══ -->
+    <section class="slide next" data-xgroup="loop" role="group" aria-label="18 / 23" tabindex="-1">
+      <div class="slide-num">18 / 23</div>
+      <div class="section-badge">피드백 루프</div>
+      <h2>Step 3. <span class="hl">카피와 상품 개선</span></h2>
+      <div class="loop4" style="margin-top:1.2%;">
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 01</div>
+          <div class="loop4-icon">📢</div>
+          <div class="loop4-title">Ads</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 02</div>
+          <div class="loop4-icon">👁</div>
+          <div class="loop4-title">Action</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step on">
+          <div class="loop4-num">STEP 03</div>
+          <div class="loop4-icon">✍️</div>
+          <div class="loop4-title">Better Copy</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 04</div>
+          <div class="loop4-icon">🔁</div>
+          <div class="loop4-title">Repeat</div>
+        </div>
+      </div>
+      <div class="step-focus">
+        <div class="step-focus-tag">STEP 03 · BETTER COPY &amp; OFFER</div>
+        <div class="step-focus-title">피드백을 반영해 메시지와 가치를 업그레이드</div>
+        <div class="step-focus-body">데이터를 바탕으로 카피를 다듬고, 상품의 가치를 더 잘 전달할 방법을 찾습니다. 고객이 어디서 이탈했는지, 어떤 표현에 반응했는지가 모두 힌트입니다. 이 과정이 VSL을 회를 거듭할수록 강력하게 만드는 핵심입니다.</div>
+      </div>
+    </section>
+
+    <!-- ══ 19 / 23  루프 Step 4 — Repeat ══ -->
+    <section class="slide next" data-xgroup="loop" role="group" aria-label="19 / 23" tabindex="-1">
+      <div class="slide-num">19 / 23</div>
+      <div class="section-badge">피드백 루프</div>
+      <h2>Step 4. <span class="hl">다시 광고, 또 반복</span> (Repeat)</h2>
+      <div class="loop4" style="margin-top:1.2%;">
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 01</div>
+          <div class="loop4-icon">📢</div>
+          <div class="loop4-title">Ads</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 02</div>
+          <div class="loop4-icon">👁</div>
+          <div class="loop4-title">Action</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step">
+          <div class="loop4-num">STEP 03</div>
+          <div class="loop4-icon">✍️</div>
+          <div class="loop4-title">Better Copy</div>
+        </div>
+        <div class="loop4-arrow">→</div>
+        <div class="loop4-step on">
+          <div class="loop4-num">STEP 04</div>
+          <div class="loop4-icon">🔁</div>
+          <div class="loop4-title">Repeat</div>
+        </div>
+      </div>
+      <div class="step-focus">
+        <div class="step-focus-tag">STEP 04 · REPEAT</div>
+        <div class="step-focus-title">루프를 돌릴수록 수익화 지점에 가까워진다</div>
+        <div class="step-focus-body">개선된 VSL로 다시 광고를 돌립니다. 그리고 또 반응을 보고, 또 고칩니다. 한 번에 완성되는 VSL은 없습니다. 돌리고, 보고, 고치는 이 사이클이 쌓일수록 수익화 지점은 반드시 옵니다.</div>
+      </div>
+    </section>
+
+    <!-- ══ 20 / 23  2단계 고도화 — Feature List ══ -->
+    <section class="slide next" role="group" aria-label="20 / 23" tabindex="-1">
+      <div class="slide-num">20 / 23</div>
+      <div class="section-badge">2단계 실행</div>
+      <h2><span class="hl">2단계:</span> 피드백 기반 고도화 (Iteration)</h2>
+      <p class="subtitle">반응이 올 때까지, 깎고 또 다듬는다</p>
+      <div class="feature-list">
+        <div class="feature-item" data-step="1">
+          <div class="feature-icon">🎨</div>
+          <div>
+            <div class="feature-title">디자인 한 단계 업그레이드</div>
+            <div class="feature-sub">1단계보다 조금 더 신경 써서 — 여전히 완벽할 필요는 없다</div>
+          </div>
+        </div>
+        <div class="feature-item" data-step="2">
+          <div class="feature-icon">✍️</div>
+          <div>
+            <div class="feature-title">설득력 한층 끌어올리기</div>
+            <div class="feature-sub">피드백 데이터를 바탕으로 카피와 구성을 다듬고 재런칭</div>
+          </div>
+        </div>
+        <div class="feature-item" data-step="3">
+          <div class="feature-icon">🎯</div>
+          <div>
+            <div class="feature-title">문의와 결제가 오면 — 성공 신호</div>
+            <div class="feature-sub">어느 순간 반응이 오기 시작한다면, 시스템이 성공 궤도에 오른 것입니다</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 21 / 23  3단계 나만의 옷 — Eq+Cards ══ -->
+    <section class="slide next" role="group" aria-label="21 / 23" tabindex="-1">
+      <div class="slide-num">21 / 23</div>
+      <div class="section-badge">3단계 실행</div>
+      <h2><span class="hl">3단계:</span> 해외 고수 전략으로 나만의 옷 입히기</h2>
+      <p class="subtitle">강의 후반부 심화 전략을 취사선택하라</p>
+      <div class="eq-cards">
+        <div class="eq-card" data-step="1">
+          <div class="eq-card-icon">🌍</div>
+          <div class="eq-card-title">글로벌 고수 전략 분석</div>
+          <div class="eq-card-desc">강의 후반부에서 다룰<br>탑티어 VSL 심화 전략들</div>
+        </div>
+        <div class="eq-arrow" data-step="2">→</div>
+        <div class="eq-card" data-step="2">
+          <div class="eq-card-icon">🎯</div>
+          <div class="eq-card-title">내 사업에 맞는 것만 선택</div>
+          <div class="eq-card-desc">모두 적용하려 하지 말고<br>내 고객에게 맞는 것만</div>
+        </div>
+        <div class="eq-arrow" data-step="3">→</div>
+        <div class="eq-card" data-step="3">
+          <div class="eq-card-icon">👑</div>
+          <div class="eq-card-title">최종 보스급 VSL 완성</div>
+          <div class="eq-card-desc">기본 뼈대 위에<br>나만의 색깔로 업그레이드</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 22 / 23  경고 — 베끼기 금지 ══ -->
+    <section class="slide next" role="group" aria-label="22 / 23" tabindex="-1">
+      <div class="slide-num">22 / 23</div>
+      <div class="section-badge">반드시 주의</div>
+      <div class="big-warning">통째로 베끼는 것은 <span class="hl-r">독</span>이다</div>
+      <p class="subtitle">청중이 다르면 전략도 반드시 달라야 한다</p>
+      <div class="citation">
+        <div class="citation-text">호르모지나 수비의 미국식 VSL을 번역기 돌리듯 그대로 흉내 내면 한국 시장에서 100% 실패합니다. 청중이 다르기 때문입니다.</div>
+      </div>
+      <div class="callout warning" data-step="1">⚠️ 구조와 원리만 차용하고, 반드시 나만의 언어와 색깔을 입히세요. 한국 고객의 정서는 본질적으로 다릅니다.</div>
+    </section>
+
+    <!-- ══ 23 / 23  챕터 요약 — Step Cards ══ -->
+    <section class="slide next" role="group" aria-label="23 / 23" tabindex="-1">
+      <div class="slide-num">23 / 23</div>
+      <div class="section-badge">챕터 1 · 정리</div>
+      <h2>요약: 완벽주의는 <span class="hl-r">적</span>입니다</h2>
+      <p class="subtitle">이 수익화 피드백 루프를 온전히 내 것으로</p>
+      <div class="step-cards">
+        <div class="step-card" data-step="1">
+          <div class="step-card-num">1</div>
+          <div>
+            <div class="step-card-title">어글리 VSL로 일단 런칭하세요</div>
+            <div class="step-card-desc">고파사 템플릿 → 최소 디자인 → 시장에 던지기</div>
+          </div>
+        </div>
+        <div class="step-card" data-step="2">
+          <div class="step-card-num">2</div>
+          <div>
+            <div class="step-card-title">피드백을 받아 고도화하세요</div>
+            <div class="step-card-desc">호르모지 루프(Ads → Action → Better Copy → Repeat) 반복</div>
+          </div>
+        </div>
+        <div class="step-card" data-step="3">
+          <div class="step-card-num">3</div>
+          <div>
+            <div class="step-card-title">검증 후 나만의 색깔을 입히세요</div>
+            <div class="step-card-desc">글로벌 고수 전략 취사선택 → 한국 고객 정서에 맞게 적용</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<button class="nav-btn prev-btn" id="btnPrev" aria-label="이전">‹</button>
+<button class="nav-btn next-btn" id="btnNext" aria-label="다음">›</button>
+<div class="slide-counter" id="slideCounter">1 / 23</div>
+<nav class="thumbnail-nav" id="thumbnailNav"></nav>
+
+<script>
+'use strict';
+const TOTAL = 23;
+
+class Deck {
+  constructor() {
+    this.idx   = 0;
+    this.step  = 0;
+    this.slides = [...document.querySelectorAll('.slide')];
+    this._buildNav();
+    this._update();
+    this._bindKeys();
+    this._bindSwipe();
+    this._bindBtns();
+    setTimeout(() => document.getElementById('hint').classList.add('hidden'), 3200);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'f' || e.key === 'F') {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        else document.exitFullscreen();
+      }
+    });
+  }
+
+  _stepsOf(slide) {
+    const nums = [...slide.querySelectorAll('[data-step]')].map(el => +el.dataset.step);
+    return nums.length ? Math.max(...nums) : 0;
+  }
+
+  _applyStep(slide, step) {
+    slide.querySelectorAll('[data-step]').forEach(el => {
+      el.classList.toggle('visible', +el.dataset.step <= step);
+    });
+  }
+
+  _go(dir) {
+    const cur = this.slides[this.idx];
+    const maxStep = this._stepsOf(cur);
+    if (dir === 1 && this.step < maxStep) {
+      this.step++;
+      this._applyStep(cur, this.step);
+      return;
+    }
+    const nextIdx = this.idx + dir;
+    if (nextIdx < 0 || nextIdx >= TOTAL) return;
+    const nxt = this.slides[nextIdx];
+
+    const sameGroup = cur.dataset.xgroup && cur.dataset.xgroup === nxt.dataset.xgroup;
+
+    cur.classList.remove('active');
+    cur.classList.remove('xfade');
+    nxt.classList.remove('xfade');
+
+    if (sameGroup) {
+      cur.classList.add('xfade', 'prev');
+      nxt.classList.add('xfade');
+    } else {
+      cur.classList.add(dir > 0 ? 'prev' : 'next');
+    }
+
+    this.idx  = nextIdx;
+    this.step = 0;
+    nxt.classList.remove('prev', 'next');
+    nxt.classList.add('active');
+    this._applyStep(nxt, 0);
+    this._update();
+  }
+
+  _update() {
+    const pct = TOTAL > 1 ? (this.idx / (TOTAL - 1)) * 100 : 100;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('slideCounter').textContent = `${this.idx + 1} / ${TOTAL}`;
+    document.getElementById('btnPrev').disabled = this.idx === 0;
+    document.getElementById('btnNext').disabled = this.idx === TOTAL - 1;
+    document.querySelectorAll('.thumbnail-dot').forEach((d, i) => d.classList.toggle('active', i === this.idx));
+  }
+
+  _buildNav() {
+    const nav = document.getElementById('thumbnailNav');
+    for (let i = 0; i < TOTAL; i++) {
+      const d = document.createElement('button');
+      d.className = 'thumbnail-dot' + (i === 0 ? ' active' : '');
+      d.setAttribute('aria-label', `슬라이드 ${i + 1}`);
+      d.addEventListener('click', () => this._jump(i));
+      nav.appendChild(d);
+    }
+  }
+
+  _jump(target) {
+    if (target === this.idx) return;
+    const cur = this.slides[this.idx];
+    const nxt = this.slides[target];
+    cur.classList.add('no-transition');
+    cur.classList.remove('active', 'xfade');
+    cur.classList.add(target > this.idx ? 'prev' : 'next');
+    this.idx  = target;
+    this.step = 0;
+    nxt.classList.add('no-transition');
+    nxt.classList.remove('prev', 'next', 'xfade');
+    nxt.classList.add('active');
+    this._applyStep(nxt, 0);
+    requestAnimationFrame(() => {
+      cur.classList.remove('no-transition');
+      nxt.classList.remove('no-transition');
+      this._update();
+    });
+  }
+
+  _bindKeys() {
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); this._go(1); }
+      if (e.key === 'ArrowLeft')                    { e.preventDefault(); this._go(-1); }
+    });
+  }
+
+  _bindSwipe() {
+    let sx = 0;
+    const deck = document.getElementById('deck');
+    deck.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
+    deck.addEventListener('touchend',   e => { const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 40) this._go(dx < 0 ? 1 : -1); }, { passive: true });
+  }
+
+  _bindBtns() {
+    document.getElementById('btnPrev').addEventListener('click', () => this._go(-1));
+    document.getElementById('btnNext').addEventListener('click', () => this._go(1));
+  }
+}
+
+new Deck();
+</script>
+</body>
+</html>
