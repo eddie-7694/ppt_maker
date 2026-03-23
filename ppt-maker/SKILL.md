@@ -100,22 +100,13 @@ This is the design DNA. Every slide must use these foundations before choosing a
 }
 ```
 
-### Background — dark charcoal with grid + vignette
-NOT pure #000. Use a deep charcoal with subtle grid lines and corner glow:
+### Background — dark charcoal with vignette (no grid)
+NOT pure #000. Use a deep charcoal with corner glow only — no grid lines:
 ```css
 html, body { background: #0a0e14; }
 .deck      { background: #0a0e14; }
-.slide     { background: transparent; } /* grid shows through */
+.slide     { background: transparent; }
 
-/* Grid overlay — add once as a fixed pseudo-element on .deck */
-.deck::before {
-  content: '';
-  position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  background-image:
-    linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
-  background-size: 60px 60px;
-}
 /* Corner vignette glow */
 .deck::after {
   content: '';
@@ -124,7 +115,7 @@ html, body { background: #0a0e14; }
     radial-gradient(ellipse 60% 50% at 0% 0%,   rgba(0,200,117,0.07) 0%, transparent 60%),
     radial-gradient(ellipse 60% 50% at 100% 100%, rgba(0,229,255,0.06) 0%, transparent 60%);
 }
-/* All slide content must be z-index: 1+ to appear above grid */
+/* All slide content must be z-index: 1+ to appear above background */
 .slide > * { position: relative; z-index: 1; }
 ```
 
@@ -225,9 +216,74 @@ Use instead of a callout when the bottom note is a quote, official statement, or
 ← → 키 또는 스와이프  |  F: 전체화면  |  S: 강사 멘트
 ```
 
+## CRITICAL RULE — Script fidelity (read before choosing any layout)
+
+스크립트에서 슬라이드를 만들 때 반드시 지켜야 할 규칙. **레이아웃 선택보다 우선순위가 높다.**
+
+### 1. 헤드카피/서브카피는 원문 그대로 배치한다
+| 스크립트 필드 | HTML 위치 | 규칙 |
+|---|---|---|
+| **헤드카피** | `<h2>` | 원문 텍스트를 그대로. 단어 순서·내용 변경 금지. |
+| **서브카피** | `<p class="subtitle">` | 원문 그대로. 레이아웃 카드 제목으로 빼거나 h2로 올리지 않는다. |
+
+**절대 금지:**
+- 헤드카피를 누락하고 서브카피를 `h2`로 올리는 것
+- 헤드카피/서브카피를 레이아웃 구성 요소(카드 제목, flow 단계명 등)로 분해·재배치하는 것
+- 두 필드를 합쳐서 하나의 문장으로 재작성하는 것
+
+### 2. 스크립트에 없는 내용은 절대 추가하지 않는다
+- 스크립트에 2개 항목이 있으면 슬라이드에도 2개만 만든다.
+- "흐름이 단순해 보인다", "빈 공간이 남는다" 같은 이유로 RESULT 카드, 추가 step, 보충 문구를 창작해서 넣지 않는다.
+- 강사 멘트(instructor notes)의 내용은 notes panel 전용이다 — 슬라이드 본문에 옮겨 쓰지 않는다.
+
+### 3. 레이아웃은 콘텐츠를 담는 그릇이지, 콘텐츠를 바꾸는 도구가 아니다
+레이아웃을 선택한 뒤 "이 레이아웃에 맞게" 텍스트를 수정하는 순간 규칙 위반이다.
+올바른 순서: **원문 텍스트 확정 → 텍스트에 맞는 레이아웃 선택 → 레이아웃 구현.**
+
+---
+
 ## Slide layout selection — variety is essential
 
-**Never repeat the same layout twice in a row.** Across a 10-slide deck, aim to use at least 4–5 different layout types. Read the content, feel the rhythm, and choose a layout that matches the emotional weight and information type of each slide.
+### 핵심 원칙: 시각적 단조로움 방지
+
+**슬라이드를 만들기 전에 전체 덱을 조감한다.** 아래 체크리스트를 통과한 뒤 구현한다.
+
+#### 레이아웃 다양성 체크리스트 (구현 전 필수)
+
+1. **연속 중복 금지** — 같은 레이아웃을 2장 연속으로 쓰지 않는다.
+2. **정렬 변화** — center-aligned 슬라이드가 전체의 70% 이하여야 한다. Split·Steps처럼 좌측 정렬 구조를 반드시 섞는다.
+3. **수직/수평 교차** — 가로 나열(Horizontal Flow, Eq+Cards) 다음 슬라이드는 세로 나열(Steps) 또는 단일 임팩트(Big Statement, Stat Callout)로 전환한다.
+4. **카드 그리드 연속 금지** — Eq+Cards·VS Card·2×2 Grid·Feature List는 연속으로 배치하지 않는다.
+5. **callout 남용 금지** — 전체 슬라이드의 절반 이하에서만 사용한다.
+6. **section-badge 생략 허용** — 임팩트 슬라이드(Big Statement, Stat Callout)에서는 생략하거나 위치를 바꾼다.
+
+#### 구조 유형 — 한 덱에서 반드시 섞어 쓴다
+
+| 구조 유형 | 해당 레이아웃 | 권장 비중 |
+|---|---|---|
+| **임팩트형** (텍스트·숫자 하나가 전부) | Big Statement, Stat Callout, Quote Block | 15–30% |
+| **분할형** (좌우·상하 분리) | Split, VS Card, Before/After, Photo Split | 20–35% |
+| **나열형** (카드·아이템 여러 개) | Eq+Cards, 2×2 Grid, Feature List, Icon Grid | 20–40% |
+| **순서형** (단계·프로세스) | Numbered Steps, Flow Diagram, Horizontal Flow | 15–30% |
+| **데이터형** (표·차트) | Comparison Table, Horizontal Bar Chart | 0–20% |
+
+#### 나쁜 패턴 vs 좋은 패턴
+
+```
+❌ 슬라이드 2: badge + h2 + subtitle + 카드 3개 + callout  (중앙 정렬)
+   슬라이드 3: badge + h2 + subtitle + 카드 3개 + callout  (중앙 정렬)
+   슬라이드 4: badge + h2 + subtitle + 카드 2개 + callout  (중앙 정렬)
+   슬라이드 5: badge + h2 + subtitle + 카드 2개 + callout  (중앙 정렬)
+→ 레이아웃 이름이 달라도 구조·정렬·밀도가 같으면 단조롭다
+```
+
+```
+✅ 슬라이드 2: Split          — 좌: 대형 키워드 / 우: 설명 리스트  (좌우 분할)
+   슬라이드 3: Stat Callout   — 숫자 하나 압도적으로              (임팩트 중앙)
+   슬라이드 4: Before/After   — 패널이 화면 대부분 차지            (풀 블리드)
+   슬라이드 5: Numbered Steps — 세로 정렬, 좌측 녹색 바 강조       (세로 좌측)
+→ 구조·정렬·밀도·색 무게가 매 슬라이드마다 다르다
+```
 
 ### Layout choice guide
 
@@ -237,7 +293,9 @@ Use instead of a callout when the bottom note is a quote, official statement, or
 | Single data point that must land hard | **Stat Callout** |
 | Famous/expert quote | **Quote Block** |
 | A = B definition, concept equation | **Equation + Cards** |
+| Key term left + explanation right | **Split** |
 | A vs B comparison with detail | **VS Card** |
+| Wrong vs right, old vs new | **Before/After** |
 | 4 equal items summary/review | **2×2 Grid** |
 | Sequential process 4–6 steps in a row | **Horizontal Flow** |
 | Complex item with checklist/tags inside | **Info Panel** |
@@ -246,6 +304,7 @@ Use instead of a callout when the bottom note is a quote, official statement, or
 | Sequential process (A→B→C) with icons | **Flow Diagram** |
 | Step-by-step action plan (ordered) | **Numbered Steps** |
 | 3–5 parallel features with icons | **Feature List** |
+| 3–4 equal concepts without sequence | **Icon Grid** |
 | Expert/person intro with photo | **Photo Split** |
 
 Think like a director: vary the pacing. A Big Statement slide after a dense list gives the audience breathing room and emphasis. Don't default to Feature List or Steps for everything.
@@ -536,12 +595,13 @@ Use when: a single data point is the whole point of the slide.
   <div class="stat-context">VSL 시스템 하나로 만들어낸 숫자</div>
 </div>
 ```
+> **stat-context 작성 규칙:** 한 줄에 딱 맞게 표시될 수 있도록 **15자 이내**로 짧게 작성한다. 긴 문장은 `stat-desc`로 올리고 `stat-context`는 간결한 보조 레이블로만 사용한다.
 ```css
 .stat-block   { display: flex; flex-direction: column; align-items: center; gap: 0.3em; }
 .stat-number  { font-size: clamp(3.5rem, 9vw, 8rem); font-weight: 700; color: var(--green); line-height: 1; letter-spacing: -0.03em; }
 .stat-unit    { font-size: clamp(1rem, 2.2vw, 2rem); color: var(--muted); margin-top: -0.2em; }
 .stat-desc    { font-size: clamp(0.9rem, 1.8vw, 1.6rem); font-weight: 700; color: var(--white); margin-top: 0.5em; }
-.stat-context { font-size: clamp(0.78rem, 1.3vw, 1.12rem); color: var(--muted); margin-top: 0.2em; }
+.stat-context { font-size: clamp(0.78rem, 1.3vw, 1.12rem); color: var(--muted); margin-top: 0.2em; word-break: keep-all; }
 ```
 
 ---
@@ -811,31 +871,9 @@ If a slide has a list of 2 items, skip the build. If a concept is meant to "land
 
 ---
 
-## Slide count expansion — analyze and add slides proactively
+## Slide count — 스크립트 충실 원칙
 
-When given a script, do not mechanically create one slide per script section. Read the content as a lecture director and apply these rules:
-
-### When to SPLIT a slide into 2:
-- A single slide has 4+ distinct sub-points → split into two slides
-- A before/after comparison is heavy on both sides → give each side its own slide first, then show the comparison
-- A process has 5+ steps → first slide shows the overview, second slide zooms into the key step
-
-### When to INSERT an extra slide:
-- **Before a major topic shift** → insert a Big Statement or section-break slide with just the new topic's core claim
-- **After a dense technical slide** → insert a simple "핵심 한 줄 요약" Big Statement slide to let it sink in
-- **When a number/stat is the punchline** → give it a dedicated Stat Callout slide, don't bury it in a list
-- **When there's a dramatic contrast** → insert a Before slide, then an After slide, instead of a combined BA slide
-- **When a quote from an expert reinforces the point** → insert a Quote Block slide
-
-### Pacing rhythm to aim for:
-Heavy content slide → Light/impact slide → Heavy → Light → ...
-
-Never put 3 dense content slides in a row. After every 2–3 complex slides, insert a breathing slide (Big Statement, Stat Callout, or Quote Block).
-
-### Default expansion target:
-- 10-slide script → aim for 13–15 slides after expansion
-- 13-slide script → aim for 16–20 slides after expansion
-- Always tell the user how many slides you created and why you added extras
+스크립트에 있는 슬라이드 수와 순서를 그대로 따른다. 임의로 슬라이드를 추가·삭제·순서 변경하지 않는다. 슬라이드 1장 = 스크립트 1개 섹션.
 
 ## Fullscreen implementation
 
@@ -880,6 +918,12 @@ When given a topic or script, generate slides that tell a coherent story with vi
 **Callout box:** Use `.callout` only when there is a genuinely important insight, warning, or punchline that the main slide content does not already make obvious. Do NOT add a callout just to fill space — the main copy in the title and cards is usually sufficient on its own. When a callout IS used, give it at least 4% top margin so it breathes. On slides where the build effect already delivers a final callout (data-step), the always-visible "static" callout is almost never needed — avoid both on the same slide.
 
 **Code blocks:** When content involves commands, prompts, or technical snippets, always render them in `.code-block-full` with monospace font and colored syntax (`.code-hl` for cyan, `.code-red` for red).
+
+**고유명사 표기 통일:** "알렉스 호르모지", "호르모지", "Hormozi" 등 모든 표기는 반드시 **알렉스 홀모지**로 통일한다. 예외 없음.
+
+**헤드카피·서브카피 원문 준수:** 슬라이드의 `h2`(헤드카피)와 `p.subtitle`(서브카피)는 스크립트의 **헤드카피·서브카피 텍스트를 그대로** 사용한다. 임의로 바꾸거나 재해석·요약하지 않는다. 스크립트에 헤드카피/서브카피가 명시된 경우 한 글자도 변경하지 않는다.
+
+**section-badge 사용 원칙:** `section-badge`는 슬라이드의 맥락을 나타내는 **짧은 레이블**(예: "섹션 2 · 개념 정의", "핵심 정리")로만 사용한다. 헤드카피나 서브카피 내용을 section-badge에 넣지 않는다. section-badge가 불필요하다면 생략해도 된다.
 
 Keep text concise — slides are visual aids, not documents. Each bullet/step fits in one line. Use `data-step` builds on individual component items so the audience can follow along.
 

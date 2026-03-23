@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>챕터 0 · VSL 오리엔테이션</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --cyan: #00E5FF;
+      --green: #00C875;
+      --green-dim: rgba(0, 200, 117, 0.12);
+      --green-border: rgba(0, 200, 117, 0.3);
+      --gold: #C6A55C;
+      --yellow: #FFD600;
+      --white: #FFFFFF;
+      --muted: rgba(255, 255, 255, 0.45);
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --red: #FF5555;
+      --red-dim: rgba(255, 85, 85, 0.12);
+      --red-border: rgba(255, 85, 85, 0.3);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      background: #0a0e14;
+      font-family: 'Noto Sans KR', 'Inter', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Progress bar ── */
+    .progress-bar-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      z-index: 200;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #0070F3, #00E5FF, #00C875);
+      transition: width 0.4s ease;
+    }
+
+    /* ── Stage & Deck ── */
+    .stage {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0e14;
+    }
+
+    .deck {
+      position: relative;
+      width: min(100vw, 177.78vh);
+      aspect-ratio: 16 / 9;
+      background: #0a0e14;
+      overflow: hidden;
+    }
+
+    .deck::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 50% at 0% 0%, rgba(0, 200, 117, 0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 100% 100%, rgba(0, 229, 255, 0.06) 0%, transparent 60%);
+    }
+
+    /* ── Slides ── */
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5% 7%;
+      transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.45s ease;
+      transform: translateX(100%);
+      opacity: 0;
+      pointer-events: none;
+      text-align: center;
+    }
+
+    .slide>* {
+      position: relative;
+      z-index: 1;
+    }
+
+    .slide.active {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+      z-index: 1;
+    }
+
+    .slide.prev {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+
+    .slide.no-transition {
+      transition: none !important;
+    }
+
+    /* ── Slide counter ── */
+    .slide-counter {
+      position: fixed;
+      bottom: 20px;
+      right: 24px;
+      font-size: clamp(11px, 1.2vw, 14px);
+      color: rgba(255, 255, 255, 0.65);
+      font-variant-numeric: tabular-nums;
+      user-select: none;
+      z-index: 150;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Thumbnail nav (dots) ── */
+    .thumbnail-nav {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 150;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+      padding: 0;
+    }
+
+    .dot.active {
+      background: var(--cyan);
+      transform: scale(1.4);
+    }
+
+    /* ── Prev / Next buttons ── */
+    .nav-btn {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: clamp(16px, 2vw, 24px);
+      width: clamp(32px, 4vw, 44px);
+      height: clamp(32px, 4vw, 44px);
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 150;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .nav-prev {
+      left: 12px;
+    }
+
+    .nav-next {
+      right: 12px;
+    }
+
+    /* ── Hint overlay ── */
+    .hint {
+      position: fixed;
+      bottom: 44px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(9px, 0.9vw, 12px);
+      color: rgba(255, 255, 255, 0.2);
+      font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+      z-index: 140;
+      pointer-events: none;
+    }
+
+    /* ── Notes panel ── */
+    .notes-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(10, 14, 20, 0.97);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1em 2em;
+      z-index: 200;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+      max-height: 28vh;
+      overflow-y: auto;
+    }
+
+    .notes-panel.open {
+      transform: translateY(0);
+    }
+
+    .notes-label {
+      font-size: clamp(9px, 0.8vw, 11px);
+      color: var(--green);
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.12em;
+      margin-bottom: 0.5em;
+    }
+
+    .notes-text {
+      font-size: clamp(11px, 1.1vw, 15px);
+      color: rgba(255, 255, 255, 0.75);
+      line-height: 1.7;
+      word-break: keep-all;
+    }
+
+    /* ── Section badge ── */
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.3em 1em;
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.55rem, 0.95vw, 0.82rem);
+      letter-spacing: 0.14em;
+      color: rgba(255, 255, 255, 0.65);
+      background: rgba(0, 229, 255, 0.05);
+      margin-bottom: 0.9em;
+    }
+
+    /* ── Typography ── */
+    h2 {
+      font-size: clamp(1.6rem, 3.8vw, 3.8rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: var(--white);
+      margin-bottom: 0.35em;
+      word-break: keep-all;
+    }
+
+    .hl {
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hl-b {
+      color: var(--cyan);
+    }
+
+    .hl-y {
+      color: var(--yellow);
+    }
+
+    .subtitle {
+      font-size: clamp(0.85rem, 1.55vw, 1.35rem);
+      color: rgba(255, 255, 255, 0.65);
+      line-height: 1.65;
+      margin-bottom: 1.2em;
+      word-break: keep-all;
+    }
+
+    .subtitle.underline {
+      border-bottom: 2px solid var(--yellow);
+      display: inline-block;
+      padding-bottom: 0.2em;
+    }
+
+    /* ── Slide num badge ── */
+    .slide-num {
+      position: absolute;
+      top: 4%;
+      right: 4%;
+      font-size: clamp(9px, 0.78vw, 11px);
+      color: rgba(255, 255, 255, 0.18);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── BIG STATEMENT ── */
+    .big-statement {
+      font-size: clamp(2.2rem, 5.5vw, 5rem);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: var(--white);
+      margin-bottom: 0.4em;
+      word-break: keep-all;
+    }
+
+    .statement-sub {
+      font-size: clamp(0.85rem, 1.8vw, 1.6rem);
+      color: var(--green);
+      letter-spacing: 0.02em;
+      word-break: keep-all;
+    }
+
+    .statement-badge {
+      font-size: clamp(0.7rem, 1.2vw, 1rem);
+      color: rgba(255, 255, 255, 0.3);
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.1em;
+      margin-bottom: 1em;
+    }
+
+    /* ── EQUATION + CARDS ── */
+    .eq-cards {
+      display: flex;
+      align-items: center;
+      gap: 1.5%;
+      width: 82%;
+      margin-top: 1.5%;
+    }
+
+    .eq-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5em;
+      padding: 1.2em 1em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .eq-card.active {
+      border-color: var(--green-border);
+      background: var(--green-dim);
+    }
+
+    .eq-card-icon {
+      font-size: clamp(1.4rem, 3vw, 2.8rem);
+      line-height: 1;
+    }
+
+    .eq-card-title {
+      font-size: clamp(0.75rem, 1.5vw, 1.3rem);
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .eq-card-desc {
+      font-size: clamp(0.6rem, 1vw, 0.88rem);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .eq-arrow {
+      color: var(--green);
+      font-size: clamp(1rem, 2vw, 1.8rem);
+      flex-shrink: 0;
+    }
+
+    /* ── CALLOUT ── */
+    .callout {
+      width: 64%;
+      padding: 0.9em 1.5em;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: clamp(0.7rem, 1.2vw, 1.05rem);
+      color: rgba(255, 255, 255, 0.75);
+      line-height: 1.65;
+      text-align: left;
+      margin-top: 3%;
+      word-break: keep-all;
+    }
+
+    .callout.warning {
+      border-color: rgba(255, 85, 85, 0.3);
+      background: rgba(255, 85, 85, 0.05);
+    }
+
+    /* ── STAT CALLOUT ── */
+    .stat-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3em;
+    }
+
+    .stat-number {
+      font-size: clamp(3.5rem, 9vw, 8rem);
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .stat-unit {
+      font-size: clamp(1rem, 2.2vw, 2rem);
+      color: var(--muted);
+      margin-top: -0.2em;
+    }
+
+    .stat-desc {
+      font-size: clamp(0.9rem, 1.8vw, 1.6rem);
+      font-weight: 700;
+      color: var(--white);
+      margin-top: 0.5em;
+      word-break: keep-all;
+    }
+
+    .stat-context {
+      font-size: clamp(0.78rem, 1.3vw, 1.12rem);
+      color: var(--muted);
+      margin-top: 0.2em;
+      word-break: keep-all;
+    }
+
+    /* ── EXPERTS ROW ── */
+    .experts-row {
+      display: flex;
+      gap: 2%;
+      width: 84%;
+      margin-top: 3%;
+    }
+
+    .expert-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5em;
+      padding: 1em 0.8em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .expert-icon {
+      font-size: clamp(1.6rem, 3vw, 2.8rem);
+    }
+
+    .expert-name {
+      font-size: clamp(0.75rem, 1.4vw, 1.2rem);
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .expert-title {
+      font-size: clamp(0.5rem, 0.9vw, 0.78rem);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .expert-stat {
+      font-size: clamp(0.7rem, 1.2vw, 1.05rem);
+      font-weight: 700;
+      color: var(--yellow);
+      margin-top: 0.3em;
+    }
+
+    /* ── BEFORE / AFTER ── */
+    .ba-container {
+      display: flex;
+      width: 78%;
+      min-height: 42%;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: 2%;
+    }
+
+    .ba-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2em 1.8em;
+      gap: 0.6em;
+    }
+
+    .ba-before {
+      background: rgba(255, 255, 255, 0.03);
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .ba-after {
+      background: var(--green-dim);
+    }
+
+    .ba-icon {
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      width: clamp(56px, 7vw, 80px);
+      height: clamp(56px, 7vw, 80px);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .ba-before .ba-icon {
+      background: rgba(255, 85, 85, 0.1);
+      border-color: var(--red-border);
+    }
+
+    .ba-after .ba-icon {
+      background: var(--green-dim);
+      border-color: var(--green-border);
+    }
+
+    .ba-label {
+      font-size: clamp(0.85rem, 1.5vw, 1.3rem);
+      font-weight: 700;
+    }
+
+    .ba-before .ba-label {
+      color: var(--red);
+    }
+
+    .ba-after .ba-label {
+      color: var(--green);
+    }
+
+    .ba-keyword {
+      font-size: clamp(1rem, 2vw, 1.8rem);
+      font-weight: 700;
+      color: var(--white);
+      word-break: keep-all;
+    }
+
+    .ba-desc {
+      font-size: clamp(0.62rem, 1.1vw, 0.95rem);
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+      word-break: keep-all;
+    }
+
+    /* ── HORIZONTAL FLOW ── */
+    .hflow {
+      display: flex;
+      align-items: center;
+      gap: 0.8%;
+      width: 86%;
+      margin-top: 2%;
+    }
+
+    .hflow-step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4em;
+      padding: 1em 0.8em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .hflow-step.active {
+      border-color: var(--green-border);
+      background: var(--green-dim);
+    }
+
+    .hflow-num {
+      font-size: clamp(0.6rem, 1.1vw, 0.95rem);
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.06em;
+    }
+
+    .hflow-icon {
+      font-size: clamp(1.2rem, 2.5vw, 2.2rem);
+    }
+
+    .hflow-title {
+      font-size: clamp(0.82rem, 1.5vw, 1.3rem);
+      font-weight: 700;
+      color: var(--white);
+      word-break: keep-all;
+    }
+
+    .hflow-sub {
+      font-size: clamp(0.55rem, 0.95vw, 0.82rem);
+      color: var(--muted);
+      word-break: keep-all;
+    }
+
+    .hflow-arrow {
+      color: var(--green);
+      font-size: clamp(1rem, 1.8vw, 1.6rem);
+      flex-shrink: 0;
+    }
+
+    /* ── SLIDE 2 · VSL SPLIT ── */
+    .vsl-split {
+      display: flex; align-items: center; width: 90%; gap: 5%; margin-top: 2%;
+    }
+    .vsl-split-left {
+      flex: 0 0 40%; display: flex; flex-direction: column; align-items: center; gap: 0.4em;
+    }
+    .vsl-giant {
+      font-size: clamp(5rem, 13vw, 11rem); font-weight: 700; line-height: 0.85;
+      background: linear-gradient(135deg, var(--cyan), var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      letter-spacing: -0.04em;
+    }
+    .vsl-eq {
+      font-size: clamp(0.8rem, 1.5vw, 1.3rem); color: rgba(255,255,255,0.55);
+      line-height: 1.6; text-align: center; word-break: keep-all;
+    }
+    .vsl-divider {
+      width: 1px; align-self: stretch; background: rgba(255,255,255,0.1); flex-shrink: 0;
+    }
+    .vsl-split-right {
+      flex: 1; display: flex; flex-direction: column; gap: 0.8em; text-align: left;
+    }
+    .vsl-row {
+      display: flex; flex-direction: column; gap: 0.2em;
+      padding: 0.85em 1.2em; background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 10px; border-left: 3px solid rgba(255,255,255,0.12);
+    }
+    .vsl-row.vsl-hl { border-left-color: var(--green); background: var(--green-dim); }
+    .vsl-term { font-size: clamp(0.85rem, 1.6vw, 1.4rem); font-weight: 700; color: var(--white); }
+    .vsl-def  { font-size: clamp(0.6rem, 1.05vw, 0.9rem); color: var(--muted); }
+
+    /* ── SLIDE 3 · STAT CALLOUT ── */
+    .expert-chips {
+      display: flex; gap: 0.8em; margin-top: 2em; flex-wrap: wrap; justify-content: center;
+    }
+    .expert-chip {
+      padding: 0.4em 1.3em; border-radius: 100px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+      font-size: clamp(0.65rem, 1.2vw, 1rem); color: rgba(255,255,255,0.55);
+      font-family: 'JetBrains Mono', monospace; letter-spacing: 0.06em;
+    }
+
+    /* ── SLIDE 5 · NUMBERED STEPS ── */
+    .steps-wrapper {
+      width: fit-content; max-width: 66%; min-width: 52%;
+      display: flex; flex-direction: column; gap: 0.6em; margin-top: 2%;
+    }
+    .step-row {
+      display: flex; align-items: center; gap: 1.2em; padding: 0.9em 1.4em;
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-left: 3px solid var(--green); border-radius: 12px; text-align: left;
+    }
+    .step-num {
+      width: clamp(38px,5vw,52px); height: clamp(38px,5vw,52px); border-radius: 50%;
+      background: var(--green); color: #000; font-weight: 700;
+      font-size: clamp(0.9rem,1.8vw,1.5rem);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .step-body { display: flex; flex-direction: column; gap: 0.15em; }
+    .step-title { font-size: clamp(0.85rem, 1.7vw, 1.5rem); font-weight: 700; color: var(--white); }
+    .step-desc  { font-size: clamp(0.55rem, 0.95vw, 0.85rem); color: var(--muted); }
+
+    /* ── OUTRO ── */
+    .outro-emoji {
+      font-size: clamp(3rem, 7vw, 6.5rem);
+      line-height: 1;
+      margin-bottom: 0.4em;
+    }
+
+    .outro-cta {
+      margin-top: 2em;
+      padding: 0.65em 2em;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      border-radius: 100px;
+      font-weight: 700;
+      font-size: clamp(0.8rem, 1.5vw, 1.3rem);
+      color: #0a0e14;
+      display: inline-block;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Progress bar -->
+  <div class="progress-bar-container">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+
+  <!-- Stage -->
+  <div class="stage" id="stage">
+    <div class="deck" id="deck">
+
+      <!-- ══════════════════════════════════════════
+           SLIDE 1 · BIG STATEMENT — 공감과 문제 제기
+      ══════════════════════════════════════════ -->
+      <section class="slide active" data-index="0">
+        <div class="slide-num">01</div>
+        <div class="statement-badge">챕터 0 · VSL 오리엔테이션</div>
+        <h2 class="big-statement">
+          아직도 라이브 웨비나에서<br>
+          <span class="hl">에너지를 쥐어짜고</span> 계신가요?
+        </h2>
+        <p class="statement-sub">매주 반복되는 '관광버스 운전대'에서 내려올 시간</p>
+      </section>
+
+      <!-- ══════════════════════════════════════════
+           SLIDE 2 · SPLIT — VSL 개념 정의
+      ══════════════════════════════════════════ -->
+      <section class="slide" data-index="1">
+        <div class="slide-num">02</div>
+        <div class="section-badge">개념 정의 · VSL이란?</div>
+        <div class="vsl-split">
+          <div class="vsl-split-left">
+            <div class="vsl-giant">VSL</div>
+            <div class="vsl-eq">글로벌 탑티어들의<br>자동화 비밀</div>
+          </div>
+          <div class="vsl-divider"></div>
+          <div class="vsl-split-right">
+            <div class="vsl-row">
+              <div class="vsl-term">🎬 Video</div>
+              <div class="vsl-def">영상 포맷으로 전달하는</div>
+            </div>
+            <div class="vsl-row">
+              <div class="vsl-term">✉️ Sales Letter</div>
+              <div class="vsl-def">설득력 있는 세일즈 편지</div>
+            </div>
+            <div class="vsl-row vsl-hl">
+              <div class="vsl-term" style="color:var(--green)">= 내 대신 세일즈하는 녹화영상</div>
+              <div class="vsl-def">한 번 만들어 놓으면 24시간 자동 세일즈 완료</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════════════════════
+           SLIDE 3 · STAT CALLOUT — 권위와 기대감
+      ══════════════════════════════════════════ -->
+      <section class="slide" data-index="2">
+        <div class="slide-num">03</div>
+        <div class="section-badge">권위 증폭 · 마케팅 거장들의 치트키</div>
+        <div class="stat-block">
+          <div class="stat-number">100억+</div>
+          <div class="stat-desc">마케팅 거장들이 VSL 하나로 만든 매출</div>
+          <div class="stat-context">이 강의에 그 노하우가 전부 담겨있다</div>
+        </div>
+        <div class="expert-chips">
+          <span class="expert-chip">🔥 알렉스 호르모지</span>
+          <span class="expert-chip">📚 러셀 브런슨</span>
+          <span class="expert-chip">⚡ 토니 로빈스</span>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════════════════════
+           SLIDE 4 · BEFORE / AFTER — 기대 효과
+      ══════════════════════════════════════════ -->
+      <section class="slide" data-index="3" style="padding: 4% 5%;">
+        <div class="slide-num">04</div>
+        <h2 style="font-size:clamp(1.8rem,4.2vw,4rem); margin-bottom:0.2em;">
+          365일 24시간,<br><span class="hl">절대 지치지 않는 영업사원</span>
+        </h2>
+        <p class="subtitle" style="margin-bottom:0.8em; font-size:clamp(0.82rem,1.4vw,1.2rem);">
+          노동 집약형 ➡️ 완벽한 '무인 자율주행 택시' 시스템으로
+        </p>
+        <div class="ba-container" style="width:88%; min-height:48%;">
+          <div class="ba-panel ba-before">
+            <div class="ba-icon" style="font-size:clamp(2.2rem,5vw,4.5rem);">🚌</div>
+            <div class="ba-label">BEFORE</div>
+            <div class="ba-keyword" style="font-size:clamp(1.1rem,2.2vw,2rem);">관광버스 운전</div>
+            <div class="ba-desc">매주 같은 시간에 사람 모으고<br>똑같은 멘트 반복하며 에너지 소진<br>내가 없으면 멈추는 구조</div>
+          </div>
+          <div class="ba-panel ba-after">
+            <div class="ba-icon" style="font-size:clamp(2.2rem,5vw,4.5rem);">🚗</div>
+            <div class="ba-label">AFTER</div>
+            <div class="ba-keyword" style="font-size:clamp(1.1rem,2.2vw,2rem);">자율주행 택시</div>
+            <div class="ba-desc">새벽에 자는 동안에도 고객 설득<br>365일 24시간 절대 지치지 않는<br>완벽한 무인 자동화 시스템</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════════════════════
+           SLIDE 5 · NUMBERED STEPS — 커리큘럼 로드맵
+      ══════════════════════════════════════════ -->
+      <section class="slide" data-index="4">
+        <div class="slide-num">05</div>
+        <div class="section-badge">커리큘럼 · 2가지 핵심 엔진</div>
+        <h2>완벽한 VSL을 완성하는<br><span class="hl">'2가지 핵심 엔진'</span></h2>
+        <p class="subtitle">코어 엔진(심장) ➡️ 그로스 엔진(터보차저) 완벽 장착하기</p>
+        <div class="steps-wrapper">
+          <div class="step-row">
+            <div class="step-num">❤️</div>
+            <div class="step-body">
+              <div class="step-title">STEP 01 · 코어 엔진</div>
+              <div class="step-desc">심장부터 만든다 — VSL의 필수 기반. 이것 없이는 아무것도 작동하지 않는다.</div>
+            </div>
+          </div>
+          <div class="step-row">
+            <div class="step-num">🚀</div>
+            <div class="step-body">
+              <div class="step-title">STEP 02 · 그로스 엔진</div>
+              <div class="step-desc">터보차저를 단다 — 완성된 심장 위에 폭발적 성장 엔진을 장착한다.</div>
+            </div>
+          </div>
+        </div>
+        <div class="callout" style="margin-top:2.5%;">📌 끝까지 따라오시기만 하면, 대표님의 비즈니스에 <strong style="color:var(--green)">두 가지 완벽한 엔진</strong>이 흔들림 없이 구축됩니다.</div>
+      </section>
+
+      <!-- ══════════════════════════════════════════
+           SLIDE 6 · BIG STATEMENT — 아웃트로
+      ══════════════════════════════════════════ -->
+      <section class="slide" data-index="5">
+        <div class="slide-num">06</div>
+        <div class="outro-emoji">🚀</div>
+        <h2 class="big-statement">
+          <span class="hl">준비</span> 되셨나요?
+        </h2>
+        <p class="statement-sub">대표님의 성공적인 VSL 여정을 진심으로 응원합니다!</p>
+        <div class="outro-cta">지금 바로 시작하기 →</div>
+      </section>
+
+    </div><!-- /.deck -->
+  </div><!-- /.stage -->
+
+  <!-- Slide counter -->
+  <div class="slide-counter" id="slideCounter">1 / 6</div>
+
+  <!-- Thumbnail nav -->
+  <nav class="thumbnail-nav" id="thumbnailNav">
+    <button class="dot active" data-idx="0" aria-label="슬라이드 1"></button>
+    <button class="dot" data-idx="1" aria-label="슬라이드 2"></button>
+    <button class="dot" data-idx="2" aria-label="슬라이드 3"></button>
+    <button class="dot" data-idx="3" aria-label="슬라이드 4"></button>
+    <button class="dot" data-idx="4" aria-label="슬라이드 5"></button>
+    <button class="dot" data-idx="5" aria-label="슬라이드 6"></button>
+  </nav>
+
+  <!-- Prev / Next buttons -->
+  <button class="nav-btn nav-prev" id="btnPrev" aria-label="이전">‹</button>
+  <button class="nav-btn nav-next" id="btnNext" aria-label="다음">›</button>
+
+  <!-- Hint -->
+  <div class="hint">← → 키 또는 스와이프 &nbsp;|&nbsp; F: 전체화면 &nbsp;|&nbsp; S: 강사 멘트</div>
+
+  <!-- Notes panel -->
+  <div class="notes-panel" id="notesPanel">
+    <div class="notes-label">▶ 강사 멘트</div>
+    <div class="notes-text" id="notesText"></div>
+  </div>
+
+  <script>
+    const NOTES = [
+      "대표님, 환영합니다. 매주 같은 시간에 사람들을 모으고, 똑같은 멘트와 농담을 반복하며 에너지를 소모하는 라이브 웨비나. 이제 지치지 않으셨나요? 오늘 이 오리엔테이션을 기점으로, 그 무한 반복의 쳇바퀴에서 완전히 벗어나게 되실 겁니다.",
+      "그렇다면 그 쳇바퀴를 멈출 대안은 무엇일까요? 바로 'VSL'입니다. 비디오 세일즈 레터(Video Sales Letter)의 약자로, 말 그대로 '영상을 통한 세일즈 편지'입니다. 앞으로 제 강의에서는 이 VSL이라는 단어를 귀에 딱지가 앉도록 사용할 겁니다. 누군가 VSL이라고 하면, '나 대신 알아서 세일즈해 주는 녹화영상'이라고 바로 떠올리시면 됩니다.",
+      "이 강의가 진짜 특별한 이유가 뭔지 아십니까? 단순히 저 혼자만의 얕은 경험담이 아니기 때문입니다. 알렉스 홀모지, 러셀 브런슨, 토니 로빈스. 이름만 들어도 가슴 뛰는 이 해외 마케팅 거장들이 VSL 하나로 100억 이상의 매출을 쓸어 담은 그 핵심 노하우가 이 강의에 한가득 들어있습니다. 7700만원이 넘는 러셀브런슨 수업료처럼 말도 안되게 비싼 수천만 원짜리 해외 컨설팅을 들으실 필요 없습니다. 그들의 모든 전략을 대표님의 비즈니스에 바로 '복붙'할 수 있도록 제가 다 떠먹여 드릴 겁니다. 기대하셔도 좋습니다.",
+      "이 어마어마한 노하우가 담긴 VSL을 제대로 구축한다는 건, 대표님이 새벽에 곤히 주무시는 시간에도 알아서 고객을 태우고 완벽하게 설득해 내는 '최고의 영업사원'을 고용하는 것과 같습니다. 내가 직접 운전해야만 굴러가는 관광버스가 아니라, 알아서 목적지까지 가는 무인 자율주행 택시를 갖게 되는 것이죠. 내 시간을 갈아 넣지 않아도 돌아가는 진짜 시스템입니다.",
+      "자, 그럼 이 압도적인 VSL 시스템을 내 비즈니스에 어떻게 구축할까요? VSL이 제대로 폭발적인 매출을 내기 위해서는 반드시 '두 가지 엔진'을 장착해야 합니다. 바로 코어엔진과 그로스엔진입니다. 본 강의를 마지막까지 정독하고 그대로 따라오시기만 하면, 대표님의 비즈니스에도 이 두 가지 완벽한 엔진이 흔들림 없이 구축될 것입니다. 심장을 먼저 만들고 터보를 다는 이 짜릿한 여정, 저와 함께 떠나보시죠!",
+      "대표님, 고된 노동의 굴레를 벗어던지고 완벽한 자동화 시스템의 주인이 되는 그날까지 제가 끝까지 멱살 잡고 끌어드리겠습니다. 대표님들의 여정을 진심으로 응원합니다!"
+    ];
+
+    class Deck {
+      constructor() {
+        this.slides = Array.from(document.querySelectorAll('.slide'));
+        this.dots = Array.from(document.querySelectorAll('.dot'));
+        this.total = this.slides.length;
+        this.current = 0;
+        this.locked = false;
+        this.notesOpen = false;
+
+        this._bind();
+        this._updateUI();
+      }
+
+      goto(n, skipTransition = false) {
+        if (this.locked && !skipTransition) return;
+        if (n < 0 || n >= this.total) return;
+        if (n === this.current && !skipTransition) return;
+
+        const prev = this.current;
+        this.current = n;
+
+        if (skipTransition) {
+          this.slides.forEach((s, i) => {
+            s.classList.remove('active', 'prev', 'no-transition');
+            s.classList.add('no-transition');
+            if (i === n) s.classList.add('active');
+            requestAnimationFrame(() => s.classList.remove('no-transition'));
+          });
+          this._updateUI();
+          return;
+        }
+
+        this.locked = true;
+        this.slides[prev].classList.remove('active');
+        this.slides[prev].classList.add('prev');
+        this.slides[n].classList.remove('prev');
+        this.slides[n].classList.add('active');
+
+        const onEnd = (e) => {
+          if (e && e.propertyName !== 'transform') return;
+          this.slides[prev].classList.remove('prev');
+          this.locked = false;
+          this.slides[n].removeEventListener('transitionend', onEnd);
+        };
+        this.slides[n].addEventListener('transitionend', onEnd);
+        setTimeout(() => { this.locked = false; }, 600);
+
+        this._updateUI();
+      }
+
+      next() { this.goto(this.current + 1); }
+      prev() { this.goto(this.current - 1); }
+
+      _updateUI() {
+        // Counter
+        document.getElementById('slideCounter').textContent = `${this.current + 1} / ${this.total}`;
+        // Progress
+        document.getElementById('progressFill').style.width = `${(this.current + 1) / this.total * 100}%`;
+        // Dots
+        this.dots.forEach((d, i) => d.classList.toggle('active', i === this.current));
+        // Notes
+        if (this.notesOpen) {
+          document.getElementById('notesText').textContent = NOTES[this.current] || '';
+        }
+      }
+
+      toggleNotes() {
+        this.notesOpen = !this.notesOpen;
+        const panel = document.getElementById('notesPanel');
+        panel.classList.toggle('open', this.notesOpen);
+        if (this.notesOpen) {
+          document.getElementById('notesText').textContent = NOTES[this.current] || '';
+        }
+      }
+
+      _bind() {
+        // Keyboard
+        document.addEventListener('keydown', (e) => {
+          if (e.repeat) return;
+          switch (e.key) {
+            case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
+              e.preventDefault(); this.next(); break;
+            case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+              e.preventDefault(); this.prev(); break;
+            case 'Home': e.preventDefault(); this.goto(0); break;
+            case 'End': e.preventDefault(); this.goto(this.total - 1); break;
+            case 'f': case 'F':
+              e.preventDefault();
+              if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+              else document.exitFullscreen();
+              break;
+            case 's': case 'S':
+              e.preventDefault(); this.toggleNotes(); break;
+          }
+        });
+
+        // Prev/Next buttons
+        document.getElementById('btnPrev').addEventListener('click', () => this.prev());
+        document.getElementById('btnNext').addEventListener('click', () => this.next());
+
+        // Dot nav
+        this.dots.forEach(d => {
+          d.addEventListener('click', () => this.goto(parseInt(d.dataset.idx)));
+        });
+
+        // Swipe
+        let tx = 0, ty = 0, ts = 0;
+        const stage = document.getElementById('stage');
+        stage.addEventListener('pointerdown', (e) => {
+          tx = e.clientX; ty = e.clientY; ts = Date.now();
+        });
+        stage.addEventListener('pointerup', (e) => {
+          const dx = e.clientX - tx;
+          const dy = e.clientY - ty;
+          const dt = Date.now() - ts;
+          if (dt < 500 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            dx < 0 ? this.next() : this.prev();
+          }
+        });
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => new Deck());
+  </script>
+</body>
+
+</html>
