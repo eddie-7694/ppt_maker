@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>내 상품을 고가로 만드는 방법 — 알렉스 홀모지</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan: #00E5FF; --green: #00C875;
+      --green-dim: rgba(0,200,117,0.12); --green-border: rgba(0,200,117,0.3);
+      --gold: #C6A55C; --yellow: #FFD600;
+      --white: #FFFFFF; --muted: rgba(255,255,255,0.45);
+      --card-bg: rgba(255,255,255,0.05); --card-border: rgba(255,255,255,0.1);
+      --red: #FF5555; --red-dim: rgba(255,85,85,0.12); --red-border: rgba(255,85,85,0.3);
+    }
+
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0a0e14;
+      font-family: 'Noto Sans KR', 'Inter', system-ui, sans-serif;
+      color: var(--white);
+    }
+
+    /* Progress bar */
+    .progress-bar-container {
+      position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 200;
+      background: rgba(255,255,255,0.1);
+    }
+    .progress-bar-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #0070F3, #00E5FF, #00C875);
+      transition: width 0.4s ease;
+    }
+
+    /* Stage & Deck */
+    .stage {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #0a0e14;
+    }
+    .deck {
+      position: relative;
+      width: min(100vw, 177.78vh);
+      aspect-ratio: 16/9;
+      background: #0a0e14;
+      overflow: hidden;
+    }
+    .deck::after {
+      content: '';
+      position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 50% at 0% 0%, rgba(0,200,117,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 100% 100%, rgba(0,229,255,0.06) 0%, transparent 60%);
+    }
+
+    /* Slides */
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 5% 7%;
+      transition: transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.45s ease;
+      transform: translateX(100%); opacity: 0; pointer-events: none;
+    }
+    .slide.active  { transform: translateX(0);    opacity: 1; pointer-events: auto; z-index: 1; }
+    .slide.prev    { transform: translateX(-100%); opacity: 0; }
+    .slide.next    { transform: translateX(100%);  opacity: 0; }
+    .slide.no-transition { transition: none !important; }
+    .slide > * { position: relative; z-index: 1; }
+
+    /* Typography */
+    h2 {
+      font-size: clamp(1.6rem, 3.8vw, 3.8rem); font-weight: 700;
+      line-height: 1.15; letter-spacing: -0.02em; color: var(--white);
+      margin-bottom: 0.35em; word-break: keep-all; text-align: center;
+    }
+    .hl  { background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hl-b { color: var(--cyan); }
+    .hl-y { color: var(--yellow); }
+
+    .subtitle {
+      font-size: clamp(0.85rem, 1.55vw, 1.35rem); color: rgba(255,255,255,0.65);
+      line-height: 1.65; margin-bottom: 1.2em;
+      display: inline-block; text-align: center; word-break: keep-all;
+    }
+
+    /* Section badge */
+    .section-badge {
+      display: inline-flex; align-items: center; padding: 0.3em 1em;
+      border: 1px solid rgba(0,229,255,0.35); border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.65rem, 1.1vw, 0.95rem);
+      letter-spacing: 0.14em; color: rgba(255,255,255,0.65);
+      background: rgba(0,229,255,0.05); margin-bottom: 0.9em;
+    }
+
+    /* Slide number */
+    .slide-num {
+      position: absolute; top: 4%; right: 4%;
+      font-size: clamp(9px,0.78vw,11px); color: rgba(255,255,255,0.18);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Slide counter */
+    .slide-counter {
+      position: fixed; bottom: 20px; right: 24px;
+      font-size: clamp(11px, 1.2vw, 14px);
+      color: rgba(255,255,255,0.65);
+      font-variant-numeric: tabular-nums;
+      user-select: none; z-index: 150;
+    }
+
+    /* Callout */
+    .callout {
+      width: 64%; padding: 0.9em 1.5em; border-radius: 10px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      font-size: clamp(0.75rem, 1.25vw, 1.1rem); color: rgba(255,255,255,0.75);
+      line-height: 1.65; text-align: left; margin-top: 4%; word-break: keep-all;
+    }
+
+    /* Nav buttons */
+    .nav-btn {
+      position: fixed; top: 50%; transform: translateY(-50%);
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.6); font-size: clamp(1.2rem, 2vw, 1.8rem);
+      width: clamp(32px, 4vw, 48px); height: clamp(32px, 4vw, 48px);
+      border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      z-index: 150; transition: background 0.2s, color 0.2s; line-height: 1;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.16); color: var(--white); }
+    .prev-btn { left: 1%; }
+    .next-btn { right: 1%; }
+
+    /* Thumbnail nav */
+    .thumbnail-nav {
+      position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 4px; z-index: 150;
+    }
+    .thumb-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: rgba(255,255,255,0.25); border: none; cursor: pointer;
+      transition: background 0.2s, width 0.2s; padding: 0;
+    }
+    .thumb-dot.active { background: var(--green); width: 16px; border-radius: 3px; }
+
+    /* Hint overlay */
+    .hint-overlay {
+      position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%);
+      font-size: clamp(9px, 0.85vw, 12px); color: rgba(255,255,255,0.3);
+      font-family: 'JetBrains Mono', monospace; white-space: nowrap;
+      z-index: 100; transition: opacity 1s ease; pointer-events: none;
+    }
+
+    /* Notes panel */
+    .notes-panel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(10,14,20,0.97); border-top: 1px solid rgba(255,255,255,0.1);
+      padding: 1.2em 2em; max-height: 28vh; overflow-y: auto;
+      z-index: 300; display: none;
+    }
+    .notes-panel.visible { display: block; }
+    .notes-label { font-size: clamp(0.6rem, 1vw, 0.85rem); color: var(--green); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; margin-bottom: 0.5em; }
+    .notes-text { font-size: clamp(0.75rem, 1.3vw, 1.1rem); color: rgba(255,255,255,0.8); line-height: 1.7; word-break: keep-all; }
+
+    /* Build animations */
+    [data-step] { opacity: 0; transform: translateY(14px); transition: opacity .38s ease, transform .38s ease; visibility: hidden; }
+    [data-step].visible { opacity: 1; transform: translateY(0); visibility: visible; }
+
+    /* ===== LAYOUTS ===== */
+
+    /* Big Statement */
+    .big-statement { font-size: clamp(2.2rem, 5.5vw, 5rem); font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; color: var(--white); margin-bottom: 0.4em; word-break: keep-all; text-align: center; }
+    .statement-sub { font-size: clamp(0.85rem, 1.8vw, 1.6rem); color: var(--green); letter-spacing: 0.02em; text-align: center; word-break: keep-all; }
+
+    /* Stat Callout */
+    .stat-block { display: flex; flex-direction: column; align-items: center; gap: 0.3em; }
+    .stat-number { font-size: clamp(3.5rem, 9vw, 8rem); font-weight: 700; color: var(--green); line-height: 1; letter-spacing: -0.03em; }
+    .stat-desc { font-size: clamp(0.9rem, 1.8vw, 1.6rem); font-weight: 700; color: var(--white); margin-top: 0.5em; }
+    .stat-context { font-size: clamp(0.78rem, 1.3vw, 1.12rem); color: var(--muted); margin-top: 0.2em; word-break: keep-all; }
+
+    /* Quote Block */
+    .quote-block { max-width: 72%; display: flex; flex-direction: column; align-items: center; gap: 0.4em; }
+    .quote-mark { font-size: clamp(3rem, 7vw, 6rem); color: var(--green); line-height: 0.8; opacity: 0.6; font-family: Georgia, serif; }
+    .quote-text { font-size: clamp(1.1rem, 2.4vw, 2.2rem); font-weight: 700; color: var(--white); text-align: center; line-height: 1.5; word-break: keep-all; }
+    .quote-author { font-size: clamp(0.75rem, 1.4vw, 1.2rem); color: var(--green); font-weight: 700; margin-top: 0.6em; }
+    .quote-role { font-size: clamp(0.55rem, 1vw, 0.9rem); color: var(--muted); }
+
+    /* VS Card */
+    .vs-grid { display: flex; gap: 2%; width: 82%; margin-top: 1.5%; }
+    .vs-card { flex: 1; display: flex; flex-direction: column; gap: 0.6em; padding: 1.4em 1.6em; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; text-align: center; }
+    .vs-card.good { border-color: var(--green-border); background: var(--green-dim); }
+    .vs-card.bad  { border-color: var(--red-border);   background: var(--red-dim); }
+    .vs-card-title { font-size: clamp(0.85rem, 1.7vw, 1.5rem); font-weight: 700; }
+    .vs-card-body  { font-size: clamp(0.75rem, 1.45vw, 1.3rem); font-weight: 700; color: var(--white); line-height: 1.5; }
+    .vs-card-desc  { font-size: clamp(0.6rem, 1.1vw, 0.95rem); color: var(--muted); line-height: 1.5; }
+    .vs-divider { display: flex; align-items: center; justify-content: center; font-size: clamp(1.5rem, 3vw, 2.5rem); color: rgba(255,255,255,0.2); padding: 0 0.5%; flex-shrink: 0; }
+
+    /* Equation + Cards */
+    .eq-section { display: flex; flex-direction: column; align-items: center; width: 100%; gap: 0.8em; }
+    .formula-box { background: rgba(0,229,255,0.05); border: 1px solid rgba(0,229,255,0.2); border-radius: 12px; padding: 0.7em 2em; font-size: clamp(0.8rem, 1.5vw, 1.3rem); color: var(--white); text-align: center; line-height: 2; }
+    .formula-num { color: var(--green); font-weight: 700; }
+    .formula-den { color: var(--red); font-weight: 700; }
+    .eq-cards { display: flex; align-items: center; gap: 1.5%; width: 90%; }
+    .eq-card { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.5em; padding: 1.2em 0.8em; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; text-align: center; }
+    .eq-card.active { border-color: var(--green-border); background: var(--green-dim); }
+    .eq-card.danger { border-color: var(--red-border); background: var(--red-dim); }
+    .eq-card-icon  { font-size: clamp(1.4rem, 3vw, 2.8rem); line-height: 1; }
+    .eq-card-title { font-size: clamp(0.7rem, 1.4vw, 1.2rem); font-weight: 700; color: var(--white); }
+    .eq-card-desc  { font-size: clamp(0.55rem, 1vw, 0.85rem); color: var(--muted); line-height: 1.5; }
+    .eq-op { font-size: clamp(1rem, 2vw, 1.8rem); color: var(--muted); flex-shrink: 0; }
+
+    /* Before/After */
+    .ba-container { display: flex; width: 76%; min-height: 38%; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); margin-top: 2%; }
+    .ba-panel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2em 1.8em; gap: 0.55em; }
+    .ba-before { background: rgba(255,255,255,0.03); }
+    .ba-after  { background: var(--green-dim); border-left: 1px solid var(--green-border); }
+    .ba-icon  { font-size: clamp(1.6rem, 3vw, 2.5rem); }
+    .ba-label { font-size: clamp(0.85rem, 1.5vw, 1.3rem); font-weight: 700; }
+    .ba-price { font-size: clamp(1.5rem, 3.5vw, 3rem); font-weight: 700; color: var(--gold); line-height: 1.1; }
+    .ba-price.green { color: var(--green); }
+    .ba-desc  { font-size: clamp(0.65rem, 1.15vw, 1rem); color: var(--muted); text-align: center; line-height: 1.6; }
+
+    /* Split */
+    .split-layout { display: flex; align-items: center; width: 84%; gap: 4%; margin-top: 2%; }
+    .split-left { flex: 0 0 32%; display: flex; flex-direction: column; gap: 0.4em; }
+    .split-tag { font-family: 'JetBrains Mono', monospace; font-size: clamp(0.5rem,0.9vw,0.8rem); color: var(--green); letter-spacing: 0.18em; text-transform: uppercase; }
+    .split-title { font-size: clamp(1.8rem, 4vw, 3.8rem); font-weight: 700; color: var(--white); line-height: 1.1; }
+    .split-divider { width: 1px; align-self: stretch; background: rgba(255,255,255,0.12); flex-shrink: 0; }
+    .split-right { flex: 1; display: flex; flex-direction: column; gap: 0.8em; text-align: left; }
+    .split-body { font-size: clamp(0.72rem, 1.4vw, 1.25rem); color: rgba(255,255,255,0.8); line-height: 1.7; }
+    .split-list { list-style: none; display: flex; flex-direction: column; gap: 0.4em; }
+    .split-list li { font-size: clamp(0.65rem, 1.2vw, 1.05rem); color: var(--muted); padding-left: 1.2em; position: relative; }
+    .split-list li::before { content: '▸'; color: var(--green); position: absolute; left: 0; }
+
+    /* Feature List */
+    .feature-list { width: fit-content; max-width: 68%; display: flex; flex-direction: column; gap: 0.6em; }
+    .feature-item { display: flex; align-items: center; gap: 1em; padding: 0.7em 1.2em; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; border-left: 3px solid var(--green); }
+    .feature-icon { width: clamp(36px,4.5vw,52px); height: clamp(36px,4.5vw,52px); border-radius: 10px; background: var(--green-dim); border: 1px solid var(--green-border); font-size: clamp(1rem,1.6vw,1.4rem); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .feature-title { font-size: clamp(0.8rem, 1.4vw, 1.2rem); font-weight: 700; color: var(--white); }
+    .feature-sub { font-size: clamp(0.55rem, 0.95vw, 0.85rem); color: var(--muted); margin-top: 0.15em; }
+
+    /* Icon Grid */
+    .icon-grid { display: flex; gap: 2.5%; width: 80%; margin-top: 2%; justify-content: center; }
+    .icon-cell { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.5em; padding: 1.4em 1em; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; }
+    .icon-emoji { font-size: clamp(1.6rem, 3.5vw, 3.2rem); line-height: 1; }
+    .icon-label { font-size: clamp(0.75rem, 1.5vw, 1.3rem); font-weight: 700; color: var(--white); text-align: center; }
+    .icon-sub   { font-size: clamp(0.5rem, 0.9vw, 0.8rem); color: var(--muted); text-align: center; line-height: 1.4; }
+
+    /* Numbered Steps */
+    .steps-wrapper { width: fit-content; max-width: 68%; min-width: 55%; display: flex; flex-direction: column; gap: 0.5em; margin-top: 1%; }
+    .step-row { display: flex; align-items: center; gap: 1.2em; padding: 0.65em 1.3em; background: var(--card-bg); border: 1px solid var(--card-border); border-left: 3px solid var(--green); border-radius: 12px; text-align: left; }
+    .step-num  { width: clamp(38px,5vw,52px); height: clamp(38px,5vw,52px); border-radius: 50%; background: var(--green); color: #000; font-weight: 700; font-size: clamp(0.9rem,1.8vw,1.5rem); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-title { font-size: clamp(0.85rem, 1.7vw, 1.5rem); font-weight: 700; color: var(--white); }
+    .step-desc  { font-size: clamp(0.55rem, 0.95vw, 0.85rem); color: var(--muted); margin-top: 0.15em; }
+
+    /* 2×2 Grid */
+    .grid22 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2%; width: 78%; margin-top: 1.5%; }
+    .grid22-card  { display: flex; flex-direction: column; gap: 0.4em; padding: 1.2em 1.4em; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; }
+    .grid22-num   { font-size: clamp(1rem, 2vw, 1.8rem); font-weight: 700; color: var(--cyan); line-height: 1; }
+    .grid22-title { font-size: clamp(0.75rem, 1.4vw, 1.25rem); font-weight: 700; color: var(--white); }
+    .grid22-desc  { font-size: clamp(0.5rem, 0.92vw, 0.8rem); color: var(--muted); line-height: 1.55; }
+
+    /* Horizontal Bar Chart */
+    .hbar-chart { width: 72%; display: flex; flex-direction: column; gap: 0.8em; margin-top: 1.5%; }
+    .hbar-row   { display: flex; align-items: center; gap: 1em; }
+    .hbar-label { font-size: clamp(0.6rem, 1.1vw, 0.95rem); font-weight: 700; color: var(--white); min-width: 28%; text-align: right; }
+    .hbar-track { flex: 1; height: clamp(26px, 3.5vw, 44px); background: rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden; }
+    .hbar-fill  { height: 100%; border-radius: 8px; display: flex; align-items: center; justify-content: flex-end; padding-right: 0.8em; font-weight: 700; font-size: clamp(0.6rem, 1.1vw, 0.95rem); color: #fff; }
+
+    /* Info chips */
+    .chip-row { display: flex; gap: 0.6em; flex-wrap: wrap; justify-content: center; margin-top: 1.2%; }
+    .chip { padding: 0.25em 0.8em; border-radius: 6px; font-size: clamp(0.48rem, 0.88vw, 0.78rem); font-family: 'JetBrains Mono', monospace; border: 1px solid; }
+    .chip.ok  { color: var(--cyan); border-color: rgba(0,229,255,0.3); background: rgba(0,229,255,0.06); }
+    .chip.dim { color: var(--muted); border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); }
+  </style>
+</head>
+<body>
+
+  <div class="progress-bar-container">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="deck" id="deck">
+
+      <!-- ① Title — Big Statement -->
+      <section class="slide active">
+        <div class="slide-num">1</div>
+        <div class="section-badge">VSL × 고가 상품</div>
+        <h2 class="big-statement">내 상품을<br><span class="hl">고가로 만드는 방법</span></h2>
+        <p class="statement-sub">알렉스 홀모지가 알려주는<br>지금 파는 똑같은 것을, 10배 비싸게 파는 프레임</p>
+      </section>
+
+      <!-- ② VS Card — 저가 vs 고가 -->
+      <section class="slide">
+        <div class="slide-num">2</div>
+        <div class="section-badge">설득의 무게</div>
+        <h2>5만 원짜리는 글로 팔린다.<br><span class="hl">100만 원짜리는?</span></h2>
+        <p class="subtitle">금액이 올라가면 설득의 도구도 달라져야 한다</p>
+        <div class="vs-grid">
+          <div class="vs-card bad" data-step="1">
+            <div class="vs-card-title" style="color:var(--muted)">저가 상품 · 3~5만 원</div>
+            <div style="font-size:clamp(1.8rem,3.5vw,3rem)">📄</div>
+            <div class="vs-card-body" style="color:rgba(255,255,255,0.5)">상세페이지 글 + 이미지</div>
+            <div class="vs-card-desc">저관여 금액 — 실패해도 타격 없음<br>텍스트만으로 설득 가능</div>
+          </div>
+          <div class="vs-divider">≠</div>
+          <div class="vs-card good" data-step="2">
+            <div class="vs-card-title" style="color:var(--green)">고가 상품 · 100만 원+</div>
+            <div style="font-size:clamp(1.8rem,3.5vw,3rem)">🎬</div>
+            <div class="vs-card-body">VSL + 체계적 퍼널</div>
+            <div class="vs-card-desc">큰돈 전에 '진짜 전문가인지' 확인 필요<br>거대한 의심을 깨는 것이 VSL</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ③ Equation + Cards — 가치 공식 -->
+      <section class="slide">
+        <div class="slide-num">3</div>
+        <div class="section-badge">가치 공식</div>
+        <h2>알렉스 홀모지의 <span class="hl">'가치 공식'</span></h2>
+        <p class="subtitle">이 4가지 레버만 조절하면 가격 저항이 사라진다</p>
+        <div class="eq-section">
+          <div class="formula-box">
+            가치 =
+            <span class="formula-num">(꿈의 결과 ① × 달성 확률 ②)</span>
+            &nbsp;÷&nbsp;
+            <span class="formula-den">(시간 지연 ③ × 노력과 희생 ④)</span>
+          </div>
+          <div class="eq-cards">
+            <div class="eq-card active" data-step="1">
+              <div class="eq-card-icon">🎯</div>
+              <div class="eq-card-title">①꿈의 결과</div>
+              <div class="eq-card-desc">분자 ↑<br>크게 키워라</div>
+            </div>
+            <div class="eq-op">×</div>
+            <div class="eq-card active" data-step="2">
+              <div class="eq-card-icon">✅</div>
+              <div class="eq-card-title">②달성 확률</div>
+              <div class="eq-card-desc">분자 ↑<br>크게 키워라</div>
+            </div>
+            <div class="eq-op" style="color:var(--red)">÷</div>
+            <div class="eq-card danger" data-step="3">
+              <div class="eq-card-icon">⏰</div>
+              <div class="eq-card-title">③시간 지연</div>
+              <div class="eq-card-desc">분모 ↓<br>최대한 줄여라</div>
+            </div>
+            <div class="eq-op" style="color:var(--red)">×</div>
+            <div class="eq-card danger" data-step="4">
+              <div class="eq-card-icon">💪</div>
+              <div class="eq-card-title">④노력과 희생</div>
+              <div class="eq-card-desc">분모 ↓<br>최대한 줄여라</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ Split — 레버① 수단 vs 변화 -->
+      <section class="slide">
+        <div class="slide-num">4</div>
+        <div class="section-badge">레버 ①</div>
+        <h2><span class="hl">레버①</span> 꿈의 결과: 고객은 도구를 사는 게 아니다</h2>
+        <p class="subtitle">결과를 산다. 변해버린 자신의 모습을 산다.</p>
+        <div class="split-layout">
+          <div class="split-left">
+            <div class="split-tag" style="color:var(--muted)">팔지 마라</div>
+            <div class="split-title" style="color:rgba(255,255,255,0.3)">수단</div>
+            <div style="font-size:clamp(0.6rem,1.05vw,0.9rem); color:var(--muted); margin-top:0.5em">"페이스북 광고 세팅 대행"</div>
+          </div>
+          <div class="split-divider"></div>
+          <div class="split-right">
+            <div class="split-tag">이것을 팔아라</div>
+            <div class="split-title" style="color:var(--green)">변화</div>
+            <div style="font-size:clamp(0.6rem,1.05vw,0.9rem); color:rgba(255,255,255,0.7); margin-bottom:0.5em">"90일 안에 매출 3천만 원 달성"</div>
+            <ul class="split-list">
+              <li>도구·기구 자체가 아닌 결과에 돈을 낸다</li>
+              <li>결제 버튼 누를 때 머릿속엔 '변해버린 내 모습'</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑤ Quote Block — 입술 필러 비유 -->
+      <section class="slide">
+        <div class="slide-num">5</div>
+        <div class="section-badge">홀모지 비유</div>
+        <h2>고객은 <span class="hl">무엇을</span> 사는가</h2>
+        <p class="subtitle">약물이 아니라, 거울 앞에서 미소 짓는 자신</p>
+        <div class="quote-block" style="margin-top:2%">
+          <div class="quote-mark">"</div>
+          <blockquote class="quote-text">고객은 입술 필러라는 끈적한 약물을 사는 게 아니다.<br>시술이 끝난 뒤 거울 앞에서 아름다워진 자신을 보며<br>미소 짓는 모습을 사는 것이다.</blockquote>
+          <div class="quote-author">— 알렉스 홀모지</div>
+          <div class="quote-role">$100M Offers 저자</div>
+        </div>
+      </section>
+
+      <!-- ⑥ Before/After — 피트니스 사례 -->
+      <section class="slide">
+        <div class="slide-num">6</div>
+        <div class="section-badge">실전 사례</div>
+        <h2>수단 → 변화, <span class="hl">실제 비즈니스 적용</span> 사례</h2>
+        <p class="subtitle">월 $99 멤버십이 $4,500 패키지로</p>
+        <div class="ba-container">
+          <div class="ba-panel ba-before">
+            <div class="ba-icon">🏋️</div>
+            <div class="ba-label" style="color:var(--muted)">BEFORE · 수단 판매</div>
+            <div class="ba-price">$99<span style="font-size:0.45em; color:var(--muted)">/월</span></div>
+            <div class="ba-desc">"우리 기구를 마음껏 쓰세요"<br>기구·공간·강사를 판매</div>
+          </div>
+          <div class="ba-panel ba-after">
+            <div class="ba-icon">🏆</div>
+            <div class="ba-label" style="color:var(--green)">AFTER · 변화 판매</div>
+            <div class="ba-price green">$4,500</div>
+            <div class="ba-desc">"45주 안에 60파운드 무조건 감량"<br>1인당 결제 금액 <strong style="color:var(--green)">4배↑</strong></div>
+          </div>
+        </div>
+        <div class="callout" style="width:72%; margin-top:3%">
+          💡 바뀐 것은 <strong style="color:var(--green)">제시하는 방식뿐</strong> — 기구, 공간, 강사는 똑같았습니다
+        </div>
+      </section>
+
+      <!-- ⑦ Big Statement — 레버② 달성 확률 -->
+      <section class="slide">
+        <div class="slide-num">7</div>
+        <div class="section-badge">레버 ②</div>
+        <h2><span class="hl">레버②</span> 달성 확률: 고객의 의심을 깨는 열쇠</h2>
+        <p class="subtitle">'좋은 것 같다'가 아니라 '나도 된다'고 믿어야 산다</p>
+        <div style="display:flex; align-items:center; gap:6%; margin-top:3%">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:0.2em">
+            <div style="font-size:clamp(3.5rem,8vw,7rem); line-height:1; color:rgba(255,255,255,0.12); font-weight:700">?</div>
+            <div style="font-size:clamp(0.75rem,1.4vw,1.25rem); color:var(--muted)">나도 진짜 될까?</div>
+          </div>
+          <div style="font-size:clamp(2rem,4vw,3.5rem); color:var(--green)">→</div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:0.2em">
+            <div style="font-size:clamp(3.5rem,8vw,7rem); line-height:1; color:var(--green); font-weight:700">!</div>
+            <div style="font-size:clamp(0.75rem,1.4vw,1.25rem); color:var(--green)">나도 된다!</div>
+          </div>
+        </div>
+        <p class="statement-sub" style="margin-top:2%; font-size:clamp(0.8rem,1.5vw,1.35rem)">달성 확률 ↑ → 분자 커짐 → 고객이 느끼는 가치 폭발</p>
+      </section>
+
+      <!-- ⑧ Feature List — 달성 확률 올리는 3가지 방법 -->
+      <section class="slide">
+        <div class="slide-num">8</div>
+        <div class="section-badge">확신의 3무기</div>
+        <h2>확신을 만드는 <span class="hl">3가지 무기</span></h2>
+        <p class="subtitle">후기, 수치, 보증</p>
+        <div class="feature-list" style="max-width:66%; min-width:54%; margin-top:2%">
+          <div class="feature-item" data-step="1">
+            <div class="feature-icon">💬</div>
+            <div>
+              <div class="feature-title">수강생 후기</div>
+              <div class="feature-sub">나와 비슷한 상황에서 성공한 사람의 스토리 — 숨겨진 반론을 원천 차단</div>
+            </div>
+          </div>
+          <div class="feature-item" data-step="2">
+            <div class="feature-icon">📊</div>
+            <div>
+              <div class="feature-title">구체적 성과 수치</div>
+              <div class="feature-sub">모호한 표현 금지 — "3개월 만에 매출 300%" 같은 숫자가 신뢰를 만든다</div>
+            </div>
+          </div>
+          <div class="feature-item" data-step="3">
+            <div class="feature-icon">🛡️</div>
+            <div>
+              <div class="feature-title">보증 / 개런티</div>
+              <div class="feature-sub">결과를 보장하는 약속 — 고객의 심리적 리스크를 제거한다</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑨ VS Card — 레버③ 시간 지연 -->
+      <section class="slide">
+        <div class="slide-num">9</div>
+        <div class="section-badge">레버 ③</div>
+        <h2><span class="hl">레버③</span> 시간 지연: 빠를수록 가치가 올라간다</h2>
+        <p class="subtitle">"언젠가"가 아니라 "12주 안에"</p>
+        <div class="vs-grid" style="margin-top:2%">
+          <div class="vs-card bad" data-step="1">
+            <div class="vs-card-title" style="color:var(--red)">기간 불명확</div>
+            <div style="font-size:clamp(2rem,4.5vw,4rem); opacity:0.3">📅</div>
+            <div class="vs-card-body" style="color:rgba(255,255,255,0.4)">"열심히 하시면<br>언젠가 됩니다"</div>
+            <div class="vs-card-desc" style="color:var(--red)">가치 ↓ — 거의 0에 가까움</div>
+          </div>
+          <div class="vs-divider">→</div>
+          <div class="vs-card good" data-step="2">
+            <div class="vs-card-title" style="color:var(--green)">기간 특정</div>
+            <div style="font-size:clamp(2rem,4.5vw,4rem)">📅</div>
+            <div class="vs-card-body">"12주 안에<br>완료해 드립니다"</div>
+            <div class="vs-card-desc" style="color:var(--green)">분모 확 줄어듦 → 가치 ↑↑</div>
+          </div>
+        </div>
+        <div class="callout" style="width:60%; margin-top:3%">
+          💡 피트니스 사례의 <strong style="color:var(--cyan)">"45주"</strong>가 바로 이 레버를 조절한 것
+        </div>
+      </section>
+
+      <!-- ⑩ Icon Grid — 레버④ 노력과 희생 -->
+      <section class="slide">
+        <div class="slide-num">10</div>
+        <div class="section-badge">레버 ④</div>
+        <h2><span class="hl">레버④</span> 노력과 희생: 쉬울수록 가치가 올라간다</h2>
+        <p class="subtitle">고객이 해야 할 일을 대신해 주는 것이 곧 프리미엄</p>
+        <div class="icon-grid">
+          <div class="icon-cell" data-step="1">
+            <div class="icon-emoji">📋</div>
+            <div class="icon-label">템플릿 제공</div>
+            <div class="icon-sub">고객 노력 ↓<br>시행착오 제거</div>
+          </div>
+          <div class="icon-cell" data-step="2">
+            <div class="icon-emoji">👥</div>
+            <div class="icon-label">1:1 코칭</div>
+            <div class="icon-sub">고객 노력 ↓↓<br>맞춤형 가이드</div>
+          </div>
+          <div class="icon-cell" data-step="3">
+            <div class="icon-emoji">⚙️</div>
+            <div class="icon-label">Done-for-you</div>
+            <div class="icon-sub">고객 노력 ↓↓↓<br>아예 대신 처리</div>
+          </div>
+          <div class="icon-cell" data-step="4">
+            <div class="icon-emoji">💬</div>
+            <div class="icon-label">커뮤니티 지원</div>
+            <div class="icon-sub">고객 노력 ↓<br>동료와 함께</div>
+          </div>
+        </div>
+        <div class="callout" style="width:66%; margin-top:3%">
+          💡 고객의 수고가 줄어든 만큼 <strong style="color:var(--green)">가격을 올릴 명분</strong>이 생깁니다
+        </div>
+      </section>
+
+      <!-- ⑪ 즉석 전환법 Before -->
+      <section class="slide">
+        <div class="slide-num">11</div>
+        <div class="section-badge">즉석 전환법</div>
+        <h2>"저는 아직 <span class="hl-y">고가 상품이 없는데요?</span>"</h2>
+        <p class="subtitle">지금 팔고 있는 서비스, 그대로 봐주세요</p>
+        <div style="background:var(--card-bg); border:2px solid rgba(255,255,255,0.12); border-radius:16px; padding:1.5em 3em; display:flex; flex-direction:column; align-items:center; gap:0.4em; margin-top:2.5%">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:clamp(0.55rem,0.95vw,0.82rem); color:var(--muted); letter-spacing:0.1em">현재 상품</div>
+          <div style="font-size:clamp(2rem,5vw,4.5rem); font-weight:700; color:rgba(255,255,255,0.35); line-height:1">상담 1회 · 10만 원</div>
+        </div>
+        <div class="chip-row">
+          <div class="chip dim">①꿈의 결과 ?</div>
+          <div class="chip dim">②달성 확률 ?</div>
+          <div class="chip dim">③시간 지연 ?</div>
+          <div class="chip dim">④노력과 희생 ?</div>
+        </div>
+        <p class="statement-sub" style="margin-top:2%; font-size:clamp(0.78rem,1.4vw,1.2rem)">4개의 레버를 한꺼번에 적용하면 어떻게 될까요?</p>
+      </section>
+
+      <!-- ⑫ 즉석 전환법 After -->
+      <section class="slide">
+        <div class="slide-num">12</div>
+        <div class="section-badge">즉석 전환법</div>
+        <h2>오늘 당장 <span class="hl">고가 상품이 탄생합니다</span></h2>
+        <p class="subtitle">4개 레버를 한 번에 적용한 결과</p>
+        <div style="background:var(--green-dim); border:2px solid var(--green-border); border-radius:16px; padding:1.5em 2.5em; display:flex; flex-direction:column; align-items:center; gap:0.5em; margin-top:2%">
+          <div style="font-size:clamp(2rem,5vw,4.5rem); font-weight:700; color:var(--green); line-height:1">300만 원</div>
+          <div style="font-size:clamp(0.68rem,1.2vw,1.05rem); color:rgba(255,255,255,0.75); text-align:center; line-height:1.6">12주 안에 자동화 시스템 구축 완료<br>주 1회 코칭 포함 · 결과 보장</div>
+          <div style="display:flex; gap:0.5em; flex-wrap:wrap; justify-content:center; margin-top:0.4em">
+            <div class="chip ok">①꿈의 결과 ✓</div>
+            <div class="chip ok">②보장 ✓</div>
+            <div class="chip ok">③12주 ✓</div>
+            <div class="chip ok">④코칭+템플릿 ✓</div>
+          </div>
+        </div>
+        <div class="callout" style="width:66%; margin-top:3%">
+          💡 바뀐 것은 <strong style="color:var(--green)">포장과 약속뿐</strong> — 대표님이 제공하는 노하우는 똑같습니다
+        </div>
+      </section>
+
+      <!-- ⑬ Before/After — 감자 비유 -->
+      <section class="slide">
+        <div class="slide-num">13</div>
+        <div class="section-badge">포장의 힘</div>
+        <h2>똑같은 감자, <span class="hl">60배 가격 차이</span></h2>
+        <p class="subtitle">본질은 동일하다. 바뀐 것은 약속뿐이다.</p>
+        <div class="ba-container">
+          <div class="ba-panel ba-before">
+            <div class="ba-icon">🥔</div>
+            <div class="ba-label" style="color:var(--muted)">시장 감자</div>
+            <div class="ba-price">500원</div>
+            <div class="ba-desc">흙 묻은 감자<br>별다른 약속 없음</div>
+          </div>
+          <div class="ba-panel ba-after">
+            <div class="ba-icon">🎁</div>
+            <div class="ba-label" style="color:var(--green)">프리미엄 패키지</div>
+            <div class="ba-price green">3만 원</div>
+            <div class="ba-desc">"3주 해독 프로그램용<br>유기농 감자 세트"<br><span style="color:var(--cyan); font-size:0.85em">레버① + ③ 적용</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑭ Split — 편의점 테스트 -->
+      <section class="slide">
+        <div class="slide-num">14</div>
+        <div class="section-badge">약속 검증</div>
+        <h2>동네 <span class="hl">편의점 테스트</span></h2>
+        <p class="subtitle">이 한마디로 즉시 고개를 끄덕이는가?</p>
+        <div class="split-layout">
+          <div class="split-left">
+            <div class="split-tag">테스트 방법</div>
+            <div class="split-title" style="font-size:clamp(1.5rem,3.2vw,3rem); color:var(--cyan)">한 문장으로<br>말하기</div>
+          </div>
+          <div class="split-divider"></div>
+          <div class="split-right">
+            <div class="split-body">우리 비즈니스를 <strong style="color:var(--white)">전혀 모르는 동네 편의점 직원</strong>에게 내 상품을 한 문장으로 말해보세요.</div>
+            <ul class="split-list">
+              <li><span style="color:var(--green)">✓ 통과</span>: 부연 설명 없이 "아~ 그런 거군요" → 완벽</li>
+              <li><span style="color:var(--red)">✗ 탈락</span>: 즉각 이해 안 됨 → 약속이 아직 추상적</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑮ VS Card — 편의점 테스트 실전 예시 -->
+      <section class="slide">
+        <div class="slide-num">15</div>
+        <div class="section-badge">통과 vs 탈락</div>
+        <h2>어떤 약속이 <span class="hl">통과</span>하는가</h2>
+        <p class="subtitle">구체적 결과 vs 추상적 설명</p>
+        <div class="vs-grid" style="margin-top:2%">
+          <div class="vs-card bad" data-step="1">
+            <div class="vs-card-title" style="color:var(--red)">✗ 탈락</div>
+            <div style="font-size:clamp(2rem,4vw,3.5rem); opacity:0.4">🤔</div>
+            <div class="vs-card-body" style="color:rgba(255,255,255,0.4)">"체계적인 피트니스<br>프로그램을 팝니다"</div>
+            <div class="vs-card-desc">수단을 말하고 있음 — 감도 안 온다</div>
+          </div>
+          <div class="vs-divider">→</div>
+          <div class="vs-card good" data-step="2">
+            <div class="vs-card-title" style="color:var(--green)">✓ 통과</div>
+            <div style="font-size:clamp(2rem,4vw,3.5rem)">👍</div>
+            <div class="vs-card-body">"12주 안에<br>40파운드를 빼드립니다"</div>
+            <div class="vs-card-desc">꿈의 결과 + 기간 특정<br>레버①③이 살아있음</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑯ Horizontal Bar Chart — 가치 스태킹 -->
+      <section class="slide">
+        <div class="slide-num">16</div>
+        <div class="section-badge">가치 스태킹</div>
+        <h2>비교 가능한 <span class="hl">가치 설계 (Value Stacking)</span></h2>
+        <p class="subtitle">시장 가격과의 압도적 갭을 보여줘라</p>
+        <div class="hbar-chart" style="width:72%">
+          <div class="hbar-row" data-step="1">
+            <div class="hbar-label">핵심 노하우</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:43%; background:#0070F3">50만 원</div></div>
+          </div>
+          <div class="hbar-row" data-step="2">
+            <div class="hbar-label">템플릿 패키지</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:26%; background:var(--cyan); color:#000">30만 원</div></div>
+          </div>
+          <div class="hbar-row" data-step="3">
+            <div class="hbar-label">1:1 코칭 (8회)</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:52%; background:var(--gold)">80만 원</div></div>
+          </div>
+          <div class="hbar-row" data-step="4">
+            <div class="hbar-label">커뮤니티 지원</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:17%; background:#7B61FF">20만 원</div></div>
+          </div>
+          <div class="hbar-row" data-step="5">
+            <div class="hbar-label" style="color:var(--green)">✦ 총 가치</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:100%; background:linear-gradient(90deg,var(--green),var(--cyan))">시장가 230만 원</div></div>
+          </div>
+          <div class="hbar-row" data-step="6">
+            <div class="hbar-label" style="color:var(--yellow)">실제 가격</div>
+            <div class="hbar-track" style="background:rgba(198,165,92,0.08)"><div class="hbar-fill" style="width:30%; background:var(--yellow); color:#000">70만 원</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑰ Stat Callout — 가치 스태킹은 VSL의 심장 -->
+      <section class="slide">
+        <div class="slide-num">17</div>
+        <h2>60분짜리 VSL 중 <span class="hl">25분을 여기에 쓴다</span></h2>
+        <p class="subtitle">해외 탑티어 마케터들의 공통 전략</p>
+        <div class="stat-block" style="margin-top:3%">
+          <div class="stat-number">25<span style="font-size:0.4em; color:var(--muted); font-weight:400">분</span></div>
+          <div class="stat-desc">60분 VSL 중 오직 가치 스태킹에만</div>
+          <div class="stat-context">사브리 수비 · 라비 아부발라 검증 공식</div>
+        </div>
+        <div class="callout" style="width:58%; margin-top:4%">
+          💡 VSL 후반부는 이 스태킹이 전부 — 스크립트 작성법은 챕터 2의 CTA 파트에서
+        </div>
+      </section>
+
+      <!-- ⑱ 2×2 Grid — 핵심 요약 -->
+      <section class="slide">
+        <div class="slide-num">18</div>
+        <div class="section-badge">핵심 요약</div>
+        <h2>오늘의 핵심, <span class="hl">4줄 요약</span></h2>
+        <p class="subtitle">이것만 기억하세요</p>
+        <div class="grid22">
+          <div class="grid22-card" data-step="1">
+            <div class="grid22-num">01</div>
+            <div class="grid22-title">VSL로 설득</div>
+            <div class="grid22-desc">고가 상품은 텍스트(상세페이지)가 아닌 영상(VSL)으로 설득해야 팔린다</div>
+          </div>
+          <div class="grid22-card" data-step="2">
+            <div class="grid22-num">02</div>
+            <div class="grid22-title">가치 공식 4레버</div>
+            <div class="grid22-desc">꿈의 결과·달성 확률·시간 지연·노력과 희생을 조절하면 가격 저항이 사라진다</div>
+          </div>
+          <div class="grid22-card" data-step="3">
+            <div class="grid22-num">03</div>
+            <div class="grid22-title">편의점 테스트</div>
+            <div class="grid22-desc">편의점 직원이 단번에 이해할 수 있을 만큼 약속을 구체화하라</div>
+          </div>
+          <div class="grid22-card" data-step="4">
+            <div class="grid22-num">04</div>
+            <div class="grid22-title">가치 스태킹</div>
+            <div class="grid22-desc">Value Stacking으로 VSL 안에서 가격 저항을 무너뜨려라</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑲ Numbered Steps — 오늘의 숙제 -->
+      <section class="slide">
+        <div class="slide-num">19</div>
+        <div class="section-badge">오늘의 숙제</div>
+        <h2>오늘의 숙제 — <span class="hl">두 가지만</span> 하세요</h2>
+        <p class="subtitle">10분이면 됩니다. 지금 바로 해주세요.</p>
+        <div class="steps-wrapper" style="max-width:70%; min-width:60%; margin-top:2%">
+          <div class="step-row" data-step="1">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">가치 공식 4레버 대입표</div>
+              <div class="step-desc">내 서비스를 ①꿈의 결과 ②달성 확률 ③시간 지연 ④노력과 희생에 한 줄씩 — 빈칸이 고가 안 되는 이유</div>
+            </div>
+          </div>
+          <div class="step-row" data-step="2">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">편의점 테스트</div>
+              <div class="step-desc">완성된 약속을 한 문장으로 정리하고 주변 사람에게 말해보기 — 즉각 이해되면 성공</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /.deck -->
+  </div><!-- /.stage -->
+
+  <div class="slide-counter" id="slideCounter">1 / 19</div>
+  <button class="nav-btn prev-btn" id="prevBtn" aria-label="이전">‹</button>
+  <button class="nav-btn next-btn" id="nextBtn" aria-label="다음">›</button>
+  <div class="thumbnail-nav" id="thumbnailNav"></div>
+  <div class="hint-overlay" id="hintOverlay">← → 키 또는 스와이프&nbsp;&nbsp;|&nbsp;&nbsp;F: 전체화면&nbsp;&nbsp;|&nbsp;&nbsp;S: 강사 멘트</div>
+
+  <div class="notes-panel" id="notesPanel">
+    <div class="notes-label">▶ 강사 멘트</div>
+    <div class="notes-text" id="notesText"></div>
+  </div>
+
+  <script>
+    const NOTES = [
+      "대표님, 이전 레슨에서 VSL이 '진짜 고객만 걸러내는 필터'라는 것을 배우셨죠? 이번 레슨에서는 한 걸음 더 나아갑니다. VSL이 왜 특히 고가 상품에 필수적인지, 그리고 '나는 아직 고가 상품이 없는데…' 하시는 분들도 오늘 강의가 끝나면 당장 상품을 고가로 바꿀 수 있는 구체적인 공식을 알려드리겠습니다.",
+      "한번 생각해 보십시오. 3만 원, 5만 원짜리 전자책은 상세페이지 글과 이미지만 잘 써도 팔립니다. 실패해도 타격이 없는 '저관여' 금액이니까요. 하지만 100만 원, 300만 원짜리 상품이라면 이야기가 완전히 달라집니다. 고객은 큰돈을 내기 전에 '이 사람이 진짜 전문가인지', '내 문제를 진짜 해결해 줄 수 있는지' 반드시 확인하고 싶어 합니다. 이 거대한 의심을 깨고 체계적으로 설득하는 것이 바로 VSL입니다.",
+      "그렇다면 도대체 사람들은 왜 비싼 돈을 내는 걸까요? 세계적인 마케터 알렉스 홀모지가 명쾌한 공식으로 답을 줬습니다. 위쪽 분자에 있는 ① '꿈의 결과'와 ② '달성 확률'은 최대한 키워주세요. 아래쪽 분모에 있는 ③ '시간 지연'과 ④ '노력과 희생'은 최대한 줄여주세요. 이 네 가지 레버의 밸런스를 맞추면 가치가 폭발하고, 가격 저항은 사라집니다.",
+      "가치 공식의 첫 번째 레버입니다. '꿈의 결과'를 키우려면 핵심은 딱 하나. '수단'이 아니라 고객이 얻게 될 '변화'를 파는 것입니다. 사람들은 '페이스북 광고 세팅 대행' 자체에 300만 원을 내지 않습니다. '90일 안에 매출 3천만 원 달성'이라는 결과에 돈을 내는 겁니다.",
+      "홀모지의 기가 막힌 비유가 있습니다. '고객은 입술 필러라는 끈적한 약물을 사는 게 아니다. 시술이 끝난 뒤 거울 앞에서 아름다워진 자신을 보며 미소 짓는 모습을 사는 것이다.' 결제 버튼을 누르는 고객의 머릿속에는 과정이 아니라, 변해버린 내 모습이 꽂혀 있어야 합니다.",
+      "실제 사례를 보시죠. 홀모지가 헬스장을 운영할 때, 기존에는 '월 $99에 우리 기구를 마음껏 쓰세요'라는 수단을 팔았습니다. 이걸 바꿨습니다. '45주 안에 60파운드를 무조건 빼드립니다. 총 $4,500입니다'라고 변화를 팔았습니다. 기구, 공간, 강사는 똑같았습니다. 바뀐 것은 제시하는 방식뿐. 1인당 결제 금액은 4배가 폭등했습니다.",
+      "두 번째 레버입니다. 아무리 꿈의 결과를 멋지게 그려줘도, 고객이 '이거 나한테도 진짜 통하는 거 맞아?'라고 의심하면 결제는 일어나지 않습니다. 달성 확률이 높다고 느껴질수록 분자가 커지고, 고객이 느끼는 가치가 올라갑니다. 그러면 이 달성 확률을 어떻게 올릴 수 있을까요?",
+      "방법은 딱 세 가지입니다. 첫째, 나와 비슷한 상황에서 성공한 사람들의 후기. 둘째, 구체적인 성과 수치. 셋째, 보증이나 개런티. 홀모지는 특히 고객이 가질 법한 핑계 — '돈이 없다, 시간이 없다, 초보다' — 를 극복하고 성공한 사람의 스토리를 VSL 안에 의도적으로 배치하라고 강조합니다.",
+      "세 번째 레버입니다. 이건 분모에 있으니까 줄여야 합니다. 같은 결과라도 1년 걸리는 것과 12주 만에 되는 것은 고객이 느끼는 가치가 하늘과 땅 차이입니다. '열심히 하시면 언젠가 됩니다'는 가치가 0에 가깝습니다. '12주 안에 완료해 드립니다'는 시간이 특정되는 순간, 분모가 확 줄어듭니다.",
+      "마지막 레버입니다. 이것도 분모니까 줄여야 합니다. 고객은 가능한 한 쉽게, 시행착오 없이 결과에 도달하고 싶어 합니다. 같은 노하우를 가르쳐도, 전자책보다는 템플릿이, 템플릿보다는 1:1 코칭이, 코칭보다는 아예 대신해 주는 Done-for-you 서비스가 가치가 높습니다.",
+      "자, '공식은 이해했는데, 저는 아직 팔 만한 고가 상품이 없습니다' 하시는 분들 분명 계실 겁니다. 걱정하지 마세요. 대표님이 지금 팔고 계신 서비스를 한번 보겠습니다. 예를 들어 '상담 1회 10만 원'이라고 해보죠. 여기에 방금 배운 4개의 레버를 한꺼번에 적용하면 어떻게 될까요?",
+      "이렇게 됩니다. 레버①로 꿈의 결과를 구체화하고, 레버③으로 12주라는 기간을 못 박고, 레버④로 주 1회 코칭과 템플릿을 붙이고, 레버②로 보장을 걸었습니다. '12주 안에 자동화 시스템 구축 완료, 주 1회 코칭 포함, 보장 — 300만 원.' 본질은 대표님이 제공하는 똑같은 노하우입니다. 바뀐 것은 포장과 약속뿐입니다.",
+      "이 원리를 가장 직관적으로 보여주는 비유입니다. 시장 감자 500원. 똑같은 감자를 예쁜 상자에 담고 '3주 해독 프로그램용 유기농 감자 세트'라고 라벨을 붙이면 3만 원이 됩니다. 바뀐 것은 가치 공식의 레버①과 ③뿐입니다. 대표님이 파시는 서비스도 마찬가지입니다.",
+      "고가 상품의 약속을 만드셨다면 반드시 검증하셔야 합니다. 우리 비즈니스를 전혀 모르는 동네 편의점 직원에게 내 상품을 한 문장으로 말해 보세요. 부연 설명 없이 '아~ 그런 거군요' 하고 즉각적으로 이해된다면 완벽합니다. 통과하지 못한다면 아직 약속이 추상적이라는 뜻입니다.",
+      "'저는 체계적인 피트니스 프로그램을 팝니다.' 편의점 직원이 이해할까요? 감도 안 옵니다. 수단을 말하고 있기 때문입니다. 반면 '12주 안에 40파운드를 빼드립니다.' 단번에 이해됩니다. 꿈의 결과가 구체적이고 기간이 특정되어 있죠. 레버①과 ③이 살아 있는 겁니다.",
+      "이제 이렇게 만든 고가 상품을 VSL 안에서 어떻게 제시할까요? 고객의 가격 저항을 무너뜨리는 기술이 바로 '가치 스태킹'입니다. 패키지에 포함된 노하우, 템플릿, 코칭을 밖에서 따로 구하면 얼마인지 시장 가치로 하나하나 쌓아 올립니다. 거대한 총 가치를 먼저 보여준 뒤 실제 파격 가격을 공개하면, 고객의 뇌는 '이건 무조건 이득이다'라고 계산을 끝내버립니다.",
+      "가치 스태킹이 얼마나 중요하냐면요. 사브리 수비, 라비 아부발라 같은 해외 탑티어 마케터들은 60분짜리 VSL에서 무려 25분을 오직 이 가치를 쌓아 올리는 데에만 씁니다. VSL 후반부는 이 스태킹이 전부라고 해도 과언이 아닙니다.",
+      "정리하겠습니다. 고가 상품은 VSL이라는 체계적인 설득 과정이 필수입니다. 상품을 설계하실 때는 가치 공식의 네 가지 레버 — 꿈의 결과, 달성 확률, 시간 지연, 노력과 희생 — 를 반드시 점검하세요. 만들어진 약속은 편의점 테스트로 직관성을 확인하시고, VSL 안에서는 가치 스태킹으로 압도적인 제안을 던지시기 바랍니다.",
+      "오늘 강의를 듣고 '아 그렇구나' 하고 넘어가시면 아무것도 바뀌지 않습니다. 딱 두 가지만 해주십시오. 첫째, 대표님 서비스를 가치 공식 4개 레버에 한 줄씩 대입해 보세요. 빈칸이 있다면 그게 아직 고가가 되지 못하는 이유입니다. 둘째, 완성된 약속을 한 문장으로 정리하시고 우리 비즈니스를 전혀 모르는 사람에게 말해 보세요. 즉각 이해된다면 성공입니다. 수고하셨습니다!"
+    ];
+
+    class Deck {
+      constructor() {
+        this.slides = [...document.querySelectorAll('.slide')];
+        this.total = this.slides.length;
+        this.current = 0;
+        this.locked = false;
+        this.stepIndex = 0;
+        this.notesVisible = false;
+        this._buildDots();
+        this._updateUI();
+        this._bind();
+        setTimeout(() => { const h = document.getElementById('hintOverlay'); if (h) h.style.opacity = '0'; }, 4000);
+      }
+
+      _buildDots() {
+        const nav = document.getElementById('thumbnailNav');
+        this.slides.forEach((_, i) => {
+          const b = document.createElement('button');
+          b.className = 'thumb-dot' + (i === 0 ? ' active' : '');
+          b.addEventListener('click', () => this.goto(i));
+          nav.appendChild(b);
+        });
+      }
+
+      _updateUI() {
+        const n = this.current + 1;
+        document.getElementById('slideCounter').textContent = n + ' / ' + this.total;
+        document.getElementById('progressFill').style.width = (n / this.total * 100) + '%';
+        document.querySelectorAll('.thumb-dot').forEach((d, i) => d.classList.toggle('active', i === this.current));
+        document.getElementById('notesText').textContent = NOTES[this.current] || '';
+        this.slides.forEach((s, i) => {
+          s.classList.remove('active', 'prev', 'next');
+          if (i === this.current) s.classList.add('active');
+          else if (i < this.current) s.classList.add('prev');
+          else s.classList.add('next');
+        });
+      }
+
+      _steps(slideEl) {
+        return [...slideEl.querySelectorAll('[data-step]')].sort((a, b) => +a.dataset.step - +b.dataset.step);
+      }
+
+      goto(idx) {
+        if (idx < 0 || idx >= this.total || this.locked) return;
+        this._steps(this.slides[this.current]).forEach(el => el.classList.remove('visible'));
+        this.current = idx;
+        this.stepIndex = 0;
+        this.locked = true;
+        this._updateUI();
+        const active = this.slides[this.current];
+        const unlock = () => { this.locked = false; };
+        active.addEventListener('transitionend', e => { if (e.propertyName === 'transform') unlock(); }, { once: true });
+        setTimeout(unlock, 520);
+      }
+
+      next() {
+        const steps = this._steps(this.slides[this.current]);
+        if (this.stepIndex < steps.length) {
+          steps[this.stepIndex].classList.add('visible');
+          this.stepIndex++;
+        } else {
+          this.goto(this.current + 1);
+        }
+      }
+
+      prev() {
+        if (this.stepIndex > 0) {
+          this.stepIndex = 0;
+          this._steps(this.slides[this.current]).forEach(el => el.classList.remove('visible'));
+        } else {
+          this.goto(this.current - 1);
+        }
+      }
+
+      _bind() {
+        document.addEventListener('keydown', e => {
+          if (e.repeat) return;
+          let handled = true;
+          switch (e.key) {
+            case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': this.next(); break;
+            case 'ArrowLeft':  case 'ArrowUp':  case 'PageUp':  this.prev(); break;
+            case 'Home': this.goto(0); break;
+            case 'End':  this.goto(this.total - 1); break;
+            case 'f': case 'F':
+              if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+              else document.exitFullscreen().catch(()=>{});
+              break;
+            case 's': case 'S':
+              this.notesVisible = !this.notesVisible;
+              document.getElementById('notesPanel').classList.toggle('visible', this.notesVisible);
+              break;
+            default: handled = false;
+          }
+          if (handled) e.preventDefault();
+        });
+        document.getElementById('prevBtn').addEventListener('click', () => this.prev());
+        document.getElementById('nextBtn').addEventListener('click', () => this.next());
+        let sx, st;
+        const stage = document.getElementById('stage');
+        stage.addEventListener('pointerdown', e => { sx = e.clientX; st = Date.now(); });
+        stage.addEventListener('pointerup', e => {
+          const dx = e.clientX - sx, dt = Date.now() - st;
+          if (dt < 500) { if (Math.abs(dx) > 50) { dx > 0 ? this.prev() : this.next(); } else { this.next(); } }
+        });
+      }
+    }
+
+    new Deck();
+  </script>
+</body>
+</html>

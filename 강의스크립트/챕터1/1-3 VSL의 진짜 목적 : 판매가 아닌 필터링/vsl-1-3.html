@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VSL의 진짜 목적 — 판매가 아닌 필터링</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --cyan: #00E5FF;
+      --green: #00C875;
+      --green-dim: rgba(0, 200, 117, 0.12);
+      --green-border: rgba(0, 200, 117, 0.3);
+      --gold: #C6A55C;
+      --yellow: #FFD600;
+      --white: #FFFFFF;
+      --muted: rgba(255, 255, 255, 0.45);
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --red: #FF5555;
+      --red-dim: rgba(255, 85, 85, 0.12);
+      --red-border: rgba(255, 85, 85, 0.3);
+    }
+
+    html,
+    body {
+      background: #0a0e14;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Noto Sans KR', 'Inter', sans-serif;
+      color: var(--white);
+    }
+
+    /* ── Progress bar ── */
+    .progress-bar-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      z-index: 200;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      transition: width 0.4s ease;
+      background: linear-gradient(90deg, #0070F3, #00E5FF, #00C875);
+    }
+
+    /* ── Stage / Deck ── */
+    .stage {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0e14;
+    }
+
+    .deck {
+      position: relative;
+      width: min(100vw, 177.78vh);
+      aspect-ratio: 16/9;
+      background: #0a0e14;
+      overflow: hidden;
+    }
+
+    .deck::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 50% at 0% 0%, rgba(0, 200, 117, 0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 100% 100%, rgba(0, 229, 255, 0.06) 0%, transparent 60%);
+    }
+
+    /* ── Slides ── */
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5% 7%;
+      transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.45s ease;
+      transform: translateX(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .slide.active {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+      z-index: 1;
+    }
+
+    .slide.prev {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+
+    .slide.next {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+
+    .slide.no-transition {
+      transition: none !important;
+    }
+
+    .slide>* {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Slide counter ── */
+    .slide-counter {
+      position: fixed;
+      bottom: 20px;
+      right: 24px;
+      font-size: clamp(11px, 1.2vw, 14px);
+      color: rgba(255, 255, 255, 0.65);
+      font-variant-numeric: tabular-nums;
+      user-select: none;
+      z-index: 150;
+      font-family: inherit;
+    }
+
+    /* ── Prev / Next buttons ── */
+    .nav-btn {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: clamp(36px, 4vw, 52px);
+      height: clamp(36px, 4vw, 52px);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: clamp(1rem, 2vw, 1.8rem);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 150;
+      transition: background 0.2s;
+      user-select: none;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--white);
+    }
+
+    .nav-prev {
+      left: 12px;
+    }
+
+    .nav-next {
+      right: 12px;
+    }
+
+    /* ── Thumbnail nav ── */
+    .thumbnail-nav {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 150;
+    }
+
+    .thumb-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .thumb-dot.active {
+      background: var(--green);
+      transform: scale(1.3);
+    }
+
+    /* ── Hint overlay ── */
+    .hint {
+      position: fixed;
+      bottom: 38px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(9px, 0.85vw, 12px);
+      color: rgba(255, 255, 255, 0.2);
+      font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+      z-index: 140;
+    }
+
+    /* ── Notes panel ── */
+    .notes-panel {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8% 12%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .notes-panel.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .notes-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.55rem, 1vw, 0.88rem);
+      color: var(--green);
+      letter-spacing: 0.18em;
+      margin-bottom: 1.4em;
+    }
+
+    .notes-body {
+      font-size: clamp(0.82rem, 1.5vw, 1.25rem);
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.8;
+      text-align: left;
+      max-width: 860px;
+      word-break: keep-all;
+    }
+
+    .notes-close {
+      margin-top: 2em;
+      font-size: clamp(0.65rem, 1.1vw, 0.9rem);
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Design tokens ── */
+    h2 {
+      font-size: clamp(1.6rem, 3.8vw, 3.8rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: var(--white);
+      margin-bottom: 0.35em;
+      word-break: keep-all;
+      text-align: center;
+    }
+
+    .hl {
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hl-b {
+      color: var(--cyan);
+    }
+
+    .hl-y {
+      color: var(--yellow);
+    }
+
+    .hl-r {
+      color: var(--red);
+    }
+
+    .subtitle {
+      font-size: clamp(0.85rem, 1.55vw, 1.35rem);
+      color: rgba(255, 255, 255, 0.65);
+      line-height: 1.65;
+      margin-bottom: 1.2em;
+      display: inline-block;
+      border-bottom: 2px solid var(--yellow);
+      padding-bottom: 0.2em;
+      text-align: center;
+      word-break: keep-all;
+    }
+
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.3em 1em;
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.65rem, 1.1vw, 0.95rem);
+      letter-spacing: 0.14em;
+      color: rgba(255, 255, 255, 0.65);
+      background: rgba(0, 229, 255, 0.05);
+      margin-bottom: 0.9em;
+    }
+
+    .callout {
+      width: 64%;
+      padding: 0.9em 1.5em;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: clamp(0.75rem, 1.25vw, 1.1rem);
+      color: rgba(255, 255, 255, 0.75);
+      line-height: 1.65;
+      text-align: left;
+      margin-top: 4%;
+      word-break: keep-all;
+    }
+
+    .callout.warning {
+      border-color: rgba(255, 85, 85, 0.3);
+      background: rgba(255, 85, 85, 0.05);
+    }
+
+    .slide-num {
+      position: absolute;
+      top: 4%;
+      right: 4%;
+      font-size: clamp(9px, 0.78vw, 11px);
+      color: rgba(255, 255, 255, 0.18);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Build animations ── */
+    [data-step] {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity .38s ease, transform .38s ease;
+      visibility: hidden;
+    }
+
+    [data-step].visible {
+      opacity: 1;
+      transform: translateY(0);
+      visibility: visible;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Big Statement
+    ══════════════════════════════════ */
+    .big-statement {
+      font-size: clamp(2.2rem, 5.5vw, 5rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: var(--white);
+      margin-bottom: 0.4em;
+      word-break: keep-all;
+      text-align: center;
+    }
+
+    .statement-sub {
+      font-size: clamp(0.85rem, 1.8vw, 1.6rem);
+      color: var(--green);
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Feature List
+    ══════════════════════════════════ */
+    .feature-list {
+      width: fit-content;
+      max-width: 68%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6em;
+      align-self: center;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 1em;
+      padding: 0.7em 1.2em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      border-left: 3px solid var(--green);
+    }
+
+    .feature-icon {
+      width: clamp(36px, 4.5vw, 52px);
+      height: clamp(36px, 4.5vw, 52px);
+      border-radius: 10px;
+      background: var(--green-dim);
+      border: 1px solid var(--green-border);
+      font-size: clamp(1rem, 1.6vw, 1.4rem);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .feature-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15em;
+    }
+
+    .feature-title {
+      font-size: clamp(0.8rem, 1.4vw, 1.2rem);
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .feature-sub {
+      font-size: clamp(0.55rem, 0.95vw, 0.85rem);
+      color: var(--muted);
+      margin-top: 0.15em;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Horizontal Flow
+    ══════════════════════════════════ */
+    .hflow {
+      display: flex;
+      align-items: center;
+      gap: 0.8%;
+      width: 88%;
+      margin-top: 1.5%;
+    }
+
+    .hflow-step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3em;
+      padding: 0.9em 0.6em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .hflow-step.danger {
+      border-color: var(--red-border);
+      background: var(--red-dim);
+    }
+
+    .hflow-num {
+      font-size: clamp(0.72rem, 1.2vw, 1.05rem);
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.06em;
+    }
+
+    .hflow-title {
+      font-size: clamp(0.92rem, 1.7vw, 1.5rem);
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .hflow-sub {
+      font-size: clamp(0.68rem, 1.1vw, 0.95rem);
+      color: var(--muted);
+    }
+
+    .hflow-arrow {
+      color: var(--red);
+      font-size: clamp(1rem, 1.8vw, 1.6rem);
+      flex-shrink: 0;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Stat Callout
+    ══════════════════════════════════ */
+    .stat-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3em;
+    }
+
+    .stat-number {
+      font-size: clamp(3.5rem, 9vw, 8rem);
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .stat-unit {
+      font-size: clamp(1rem, 2.2vw, 2rem);
+      color: var(--muted);
+      margin-top: -0.2em;
+    }
+
+    .stat-desc {
+      font-size: clamp(0.9rem, 1.8vw, 1.6rem);
+      font-weight: 700;
+      color: var(--white);
+      margin-top: 0.5em;
+      text-align: center;
+    }
+
+    .stat-context {
+      font-size: clamp(0.78rem, 1.3vw, 1.12rem);
+      color: var(--muted);
+      margin-top: 0.2em;
+      word-break: keep-all;
+      text-align: center;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Quote Block
+    ══════════════════════════════════ */
+    .quote-block {
+      max-width: 72%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4em;
+    }
+
+    .quote-mark {
+      font-size: clamp(3rem, 7vw, 6rem);
+      color: var(--green);
+      line-height: 0.8;
+      opacity: 0.6;
+      font-family: Georgia, serif;
+    }
+
+    .quote-text {
+      font-size: clamp(1.1rem, 2.4vw, 2.2rem);
+      font-weight: 700;
+      color: var(--white);
+      text-align: center;
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+
+    .quote-author {
+      font-size: clamp(0.75rem, 1.4vw, 1.2rem);
+      color: var(--green);
+      font-weight: 700;
+      margin-top: 0.6em;
+    }
+
+    .quote-role {
+      font-size: clamp(0.55rem, 1vw, 0.9rem);
+      color: var(--muted);
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Before / After
+    ══════════════════════════════════ */
+    .ba-container {
+      display: flex;
+      width: 80%;
+      min-height: 42%;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: 2%;
+    }
+
+    .ba-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2.2em 2em;
+      gap: 0.55em;
+    }
+
+    .ba-before {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .ba-after {
+      background: var(--green-dim);
+    }
+
+    .ba-after.danger {
+      background: var(--red-dim);
+    }
+
+    .ba-icon {
+      width: clamp(40px, 5.5vw, 60px);
+      height: clamp(40px, 5.5vw, 60px);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(1rem, 1.8vw, 1.6rem);
+      font-weight: 700;
+    }
+
+    .ba-label {
+      font-size: clamp(0.85rem, 1.5vw, 1.3rem);
+      font-weight: 700;
+    }
+
+    .ba-desc {
+      font-size: clamp(0.72rem, 1.2vw, 1.05rem);
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Icon Grid
+    ══════════════════════════════════ */
+    .icon-grid {
+      display: flex;
+      gap: 2.5%;
+      width: 82%;
+      margin-top: 2%;
+      justify-content: center;
+    }
+
+    .icon-cell {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5em;
+      padding: 1.4em 1em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+    }
+
+    .icon-emoji {
+      font-size: clamp(1.6rem, 3.5vw, 3.2rem);
+      line-height: 1;
+    }
+
+    .icon-label {
+      font-size: clamp(0.75rem, 1.5vw, 1.3rem);
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .icon-sub {
+      font-size: clamp(0.5rem, 0.9vw, 0.8rem);
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Split
+    ══════════════════════════════════ */
+    .split-layout {
+      display: flex;
+      align-items: center;
+      width: 84%;
+      gap: 4%;
+      margin-top: 2%;
+    }
+
+    .split-left {
+      flex: 0 0 32%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4em;
+    }
+
+    .split-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.5rem, 0.9vw, 0.8rem);
+      color: var(--green);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .split-title {
+      font-size: clamp(1.8rem, 4vw, 3.8rem);
+      font-weight: 700;
+      color: var(--white);
+      line-height: 1.1;
+    }
+
+    .split-divider {
+      width: 1px;
+      align-self: stretch;
+      background: rgba(255, 255, 255, 0.12);
+      flex-shrink: 0;
+    }
+
+    .split-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8em;
+      text-align: left;
+    }
+
+    .split-body {
+      font-size: clamp(0.72rem, 1.4vw, 1.25rem);
+      color: rgba(255, 255, 255, 0.8);
+      line-height: 1.7;
+    }
+
+    .split-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4em;
+    }
+
+    .split-list li {
+      font-size: clamp(0.65rem, 1.2vw, 1.05rem);
+      color: var(--muted);
+      padding-left: 1.2em;
+      position: relative;
+      line-height: 1.6;
+    }
+
+    .split-list li::before {
+      content: '▸';
+      color: var(--green);
+      position: absolute;
+      left: 0;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: VS Card
+    ══════════════════════════════════ */
+    .vs-grid {
+      display: flex;
+      gap: 2%;
+      width: 84%;
+      margin-top: 1.5%;
+    }
+
+    .vs-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6em;
+      padding: 1.4em 1.6em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      text-align: center;
+    }
+
+    .vs-card.red-card {
+      border-color: var(--red-border);
+      background: var(--red-dim);
+    }
+
+    .vs-card.green-card {
+      border-color: var(--green-border);
+      background: var(--green-dim);
+    }
+
+    .vs-card-title {
+      font-size: clamp(0.85rem, 1.7vw, 1.5rem);
+      font-weight: 700;
+    }
+
+    .vs-card-desc {
+      font-size: clamp(0.55rem, 1vw, 0.88rem);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .vs-card-body {
+      font-size: clamp(0.7rem, 1.35vw, 1.2rem);
+      font-weight: 700;
+      color: var(--white);
+      line-height: 1.5;
+    }
+
+    .vs-card-quote {
+      font-size: clamp(0.48rem, 0.85vw, 0.75rem);
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* ══════════════════════════════════
+       LAYOUT: Numbered Steps
+    ══════════════════════════════════ */
+    .steps-wrapper {
+      width: fit-content;
+      max-width: 68%;
+      min-width: 55%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5em;
+      margin-top: 1%;
+    }
+
+    .step-row {
+      display: flex;
+      align-items: center;
+      gap: 1.2em;
+      padding: 0.65em 1.3em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-left: 3px solid var(--green);
+      border-radius: 12px;
+      text-align: left;
+    }
+
+    .step-num {
+      width: clamp(38px, 5vw, 52px);
+      height: clamp(38px, 5vw, 52px);
+      border-radius: 50%;
+      background: var(--green);
+      color: #000;
+      font-weight: 700;
+      font-size: clamp(0.9rem, 1.8vw, 1.5rem);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1em;
+    }
+
+    .step-title {
+      font-size: clamp(0.85rem, 1.7vw, 1.5rem);
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .step-desc {
+      font-size: clamp(0.55rem, 0.95vw, 0.85rem);
+      color: var(--muted);
+      margin-top: 0.15em;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Progress bar -->
+  <div class="progress-bar-container">
+    <div class="progress-bar-fill" id="progressFill" style="width:7.14%"></div>
+  </div>
+
+  <!-- Stage -->
+  <div class="stage">
+    <div class="deck" id="deck">
+
+      <!-- ─────────────────────────────
+         SLIDE 0 · 타이틀
+    ───────────────────────────────── -->
+      <section class="slide active"
+        data-notes="이번 강의는 VSL의 진짜 목적이 판매가 아닌 필터링임을 다루는 강의입니다. 상담 꽉 찼다는 SNS 자랑부터 시작해서, 3가지 방탄 마인드까지 차근차근 안내하겠습니다.">
+        <h2>VSL의 진짜 목적은<br><span class="hl">'판매'가 아닌 '필터링(Filtering)'</span></h2>
+        <p class="subtitle">구경꾼은 걸러내고, 진성 고객만 남기는 하이티켓 세일즈 전략</p>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 1 · Big Statement
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="가끔 SNS에 보면 '이번 달 상담 꽉 찼습니다!' 하고 자랑하는 분들이 있습니다. 댓글엔 '대박이네요', '너무 부러워요' 이런 반응들이 줄을 잇죠. 저도 예전엔 그게 성공인 줄 알았습니다. 하지만 그거 아세요? 상담이 쏟아져 들어온다고 해서, 그 사람들이 100% 결제를 하는 건 절대 아닙니다.">
+        <div class="section-badge">착각의 시작</div>
+        <h2 class="big-statement">"이번 달 상담 꽉 찼습니다!"</h2>
+        <p class="statement-sub">문의가 폭주한다고 100% 결제하는 것은 아니다</p>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 2 · Feature List
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="하이티켓, 즉 고가상품은 특성상 1:1 상담을 거쳐야 결제가 이루어집니다. 아무런 허들 없이 상담 신청이 열려있으면 구경꾼들과 한 달 내내 통화하게 됩니다. 결제는 안 나오는데 시간은 사라지고, 에너지는 바닥나고, 결국 세일즈 자체가 고통이 됩니다.">
+        <div class="section-badge">문제 정의</div>
+        <h2>고가 상품 세일즈의 숙명<br><span class="hl">구경꾼의 습격</span></h2>
+        <p class="subtitle">상담이 많을수록 세일즈 멘탈이 무너진다</p>
+        <div class="feature-list">
+          <div class="feature-item" data-step="1">
+            <div class="feature-icon">🎭</div>
+            <div class="feature-body">
+              <div class="feature-title">무료 조언 사냥꾼</div>
+              <div class="feature-sub">살 마음은 없고 무료 정보만 긁어가는 유형</div>
+            </div>
+          </div>
+          <div class="feature-item" data-step="2">
+            <div class="feature-icon">👀</div>
+            <div class="feature-body">
+              <div class="feature-title">그냥 알아보는 중</div>
+              <div class="feature-sub">"한번 알아보는 중이에요" 하고 전화 끊는 유형</div>
+            </div>
+          </div>
+          <div class="feature-item" data-step="3">
+            <div class="feature-icon">💀</div>
+            <div class="feature-body">
+              <div class="feature-title">멘탈 붕괴</div>
+              <div class="feature-sub">시간 소멸 · 에너지 고갈 · 세일즈 포비아</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 3 · Horizontal Flow
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="솔직히 말씀드리면, 저도 과거에는 단 한 건이라도 상담이 더 들어오게 하려고 온갖 노력을 다했습니다. 들어온 문의를 어떻게든 결제로 이어보려고 세일즈 실력을 키우는 데에만 집착했죠. 하지만 아무리 세일즈 실력을 키워도, 모든 고객이 문의 수에 비례해서 결제하진 않더라고요. 매일같이 세일즈 통화를 하거나, 줌미팅 한 뒤 거절당하는 게 반복되니, 결국 멘탈이 나가고 제 자신이 망가지기 시작했습니다.">
+        <div class="section-badge">5년의 착각</div>
+        <h2>저 역시 <span class="hl-r">5년 넘게</span> 착각했습니다</h2>
+        <p class="subtitle">세일즈 실력만 키우면 다 팔릴 줄 알았던 과거</p>
+        <div class="hflow">
+          <div class="hflow-step" data-step="1">
+            <div class="hflow-num">01</div>
+            <div class="hflow-title">착각</div>
+            <div class="hflow-sub">상담 수만<br>늘리면 된다</div>
+          </div>
+          <div class="hflow-arrow" data-step="2">→</div>
+          <div class="hflow-step" data-step="2">
+            <div class="hflow-num">02</div>
+            <div class="hflow-title">집착</div>
+            <div class="hflow-sub">세일즈 스킬에만<br>5년 투자</div>
+          </div>
+          <div class="hflow-arrow" data-step="3">→</div>
+          <div class="hflow-step" data-step="3">
+            <div class="hflow-num">03</div>
+            <div class="hflow-title">거절 반복</div>
+            <div class="hflow-sub">매일 줌미팅<br>후 거절</div>
+          </div>
+          <div class="hflow-arrow" data-step="4">→</div>
+          <div class="hflow-step danger" data-step="4">
+            <div class="hflow-num">04</div>
+            <div class="hflow-title">멘탈 붕괴</div>
+            <div class="hflow-sub">에너지 바닥<br>자신이 망가짐</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 4 · Stat Callout
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="도저히 안 되겠다 싶어 전략을 180도 바꿨습니다. 엄청난 허들을 세웠죠. 영상을 끝까지 봐야만 하고, 심지어 15분 분량의 OT 영상까지 필수로 보게 만들었습니다. 가격도 '550만 원'이라고 아예 대놓고 공개해 버렸어요. 상담 수는 엄청나게 줄었습니다. 하지만 결제율은 놀랍게도 거의 100%로 올랐습니다. 심지어 제가 거절해도 '제발 받아달라'고 갑을 관계가 바뀌는 경우도 많아졌습니다.">
+        <div class="section-badge">전략 전환</div>
+        <h2>허들을 극도로 높이자<br><span class="hl">벌어진 기적</span></h2>
+        <div class="stat-block" style="margin-top:2%">
+          <div class="stat-number">100%</div>
+          <div class="stat-desc">문의는 줄었지만, 결제율은 100% 가까이 높아졌다</div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 5 · Quote Block
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="처음엔 저도 당황했습니다. '내가 거절했는데 왜 더 매달리지?' 설득의 심리학을 쓴 로버트 치알디니의 '희귀성(Scarcity)' 원리와 심리적 반발(reactance) 패턴으로 이게 설명되더라고요. 1:1 상담에서 명확하게 '죄송하지만 제가 도와드릴 수 없습니다'라고 단호히 거절하면, 고객은 그 도움을 더 희귀하고 특별한 자원으로 인식하게 됩니다. 그 결과, 이 사람 아니면 안 된다는 심리적 집착이 생기고, 오히려 더 도와달라고 요청해 오는 패턴이 반복됩니다.">
+        <div class="section-badge">심리학적 근거</div>
+        <h2>거절할수록 고객은<br><span class="hl">더 간절해진다</span></h2>
+        <div class="quote-block" style="margin-top:2%">
+          <div class="quote-mark">"</div>
+          <blockquote class="quote-text">희귀한 것은 더 가치있어 보인다.<br>거절당할수록 더 원하게 된다.</blockquote>
+          <div class="quote-author">— 로버트 치알디니</div>
+          <div class="quote-role">《설득의 심리학》 저자 · 희귀성(Scarcity) 원리</div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 6 · Before / After
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="막상 내 비즈니스에 이런 '허들'을 치려고 하면, 문의율이 기하급수적으로 떨어질까 봐 마음속 두려움이 엄청나게 커집니다. 하지만 대표님, 문의는 많지만 1:1 상담 후 매번 거절당하고 기가 빨리는 일을 장기적으로 겪는다고 상상해 보세요. 결국 '이 길은 내 길이 아닌가 보다'라며 스스로 지쳐 포기하게 됩니다.">
+        <div class="section-badge">심리적 장벽</div>
+        <h2>문의가 뚝 끊길까 봐<br><span class="hl-y">두려우신가요?</span></h2>
+        <p class="subtitle">허들을 세울 때 찾아오는 심리적 장벽</p>
+        <div class="ba-container">
+          <div class="ba-panel ba-before" data-step="1">
+            <div class="ba-icon" style="background:rgba(255,85,85,0.15); color:var(--red);">😰</div>
+            <div class="ba-label" style="color:var(--red);">허들 없음</div>
+            <div class="ba-desc">문의는 많지만<br>구경꾼 상담 반복<br>→ 에너지 고갈 → 포기</div>
+          </div>
+          <div style="width:1px; background:rgba(255,255,255,0.08); flex-shrink:0;"></div>
+          <div class="ba-panel ba-after" data-step="2">
+            <div class="ba-icon" style="background:var(--green-dim); color:var(--green);">🎯</div>
+            <div class="ba-label" style="color:var(--green);">허들 설치</div>
+            <div class="ba-desc">문의는 줄지만<br>진성 고객만 남음<br>→ 결제율 100% 실현</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 7 · Icon Grid
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="차라리 문의 수는 적더라도 결제율을 획기적으로 높이는 게 사업을 장기적으로 유지하는 데 훨씬 좋습니다. 말도 안 통하는 사람과 한 두시간씩 상담하며 감정을 소모할 시간을 아껴보세요. 그 시간에 내 상품을 더 고도화하거나, 마케팅 전략을 짜거나, 가족과 시간을 보내는 등 훨씬 더 효율적이고 중요한 일에 에너지를 쓸 수 있습니다.">
+        <div class="section-badge">시간의 재배분</div>
+        <h2>사업을 장기적으로 유지하는<br><span class="hl">진짜 비결</span></h2>
+        <p class="subtitle">양보다 질, 시간의 밀도를 높여라</p>
+        <div class="icon-grid">
+          <div class="icon-cell" data-step="1">
+            <div class="icon-emoji">⚙️</div>
+            <div class="icon-label">상품 고도화</div>
+            <div class="icon-sub">아낀 시간으로<br>서비스 퀄리티 향상</div>
+          </div>
+          <div class="icon-cell" data-step="2">
+            <div class="icon-emoji">📊</div>
+            <div class="icon-label">마케팅 전략</div>
+            <div class="icon-sub">더 좋은 퍼널<br>설계에 집중</div>
+          </div>
+          <div class="icon-cell" data-step="3">
+            <div class="icon-emoji">🏠</div>
+            <div class="icon-label">삶의 균형</div>
+            <div class="icon-sub">가족과 시간<br>번아웃 방지</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 8 · Big Statement
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="내 비즈니스에 올바른 허들을 쳤을 때, 문의가 줄어들어도 절대 흔들리지 않는 '방탄 마인드'가 반드시 필요합니다. 지금부터 글로벌 최고 전문가들이 VSL을 돌릴 때 장착하는 3가지 방탄 마인드를 하나씩 알려드리겠습니다. 심호흡 한번 하시고, 잘 따라오십시오.">
+        <h2 class="big-statement">흔들리지 않는<br><span class="hl">'방탄 마인드'</span>가<br>필요합니다</h2>
+        <p class="statement-sub">두려움을 이겨낼 3가지 무기</p>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 9 · Stat Callout
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="방탄 마인드 첫 번째, VSL 영상 초반 이탈률을 두려워하지 말고 기뻐하십시오. 수백억 자산가 라비 아부발라는 타겟 고객은 항상 전체 시장의 1~3%에 불과하다고 말합니다. 영상 초반에 나가는 사람들은 어차피 내게 돈을 쓰지 않을 사람들입니다. 부적합자를 적극적으로 이탈시켜야 영업 팀의 시간 낭비를 막을 수 있습니다.">
+        <div class="section-badge">방탄 마인드 ①</div>
+        <h2>방탄 마인드 ①<br><span class="hl">"초반 이탈을 기뻐하라"</span></h2>
+        <div style="margin-top:3%; display:flex; flex-direction:column; align-items:center; gap:1.2em; width:68%;">
+          <div style="width:100%; padding:1.4em 2em; background:rgba(255,85,85,0.08); border:1px solid rgba(255,85,85,0.3); border-left:4px solid var(--red); border-radius:12px; text-align:center;">
+            <div style="font-size:clamp(1rem,2vw,1.7rem); font-weight:700; color:var(--white); line-height:1.6; word-break:keep-all;">
+              초반에 <strong style="color:var(--red);">97%</strong>가 이탈하는 건<br><strong style="color:var(--white);">당연한 현상</strong>입니다
+            </div>
+          </div>
+          <div style="width:100%; padding:1.4em 2em; background:var(--green-dim); border:1px solid var(--green-border); border-left:4px solid var(--green); border-radius:12px; text-align:center;">
+            <div style="font-size:clamp(1rem,2vw,1.7rem); font-weight:700; color:var(--white); line-height:1.6; word-break:keep-all;">
+              진짜 고객은 전체 시장의 <strong style="color:var(--green);">1~3%</strong>에 불과하기 때문
+            </div>
+          </div>
+          <div style="font-size:clamp(0.6rem,1vw,0.88rem); color:var(--muted); margin-top:0.3em;">— 라비 아부발라</div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 10 · Split
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="방탄 마인드 두 번째, 대놓고 밀어내십시오. 대니얼 아이리스는 맞지 않는 고객을 의도적으로 '밀어내어(Push away)' 자격 없는 리드를 걸러내는 필터 역할을 수행해야 한다고 강조합니다. '실행할 마음이 없다면 지금 당장 끄세요'라고 선을 긋는 겁니다. 이렇게 밀어낼 때, 남아있는 진짜 고객들은 이 제안이 오직 자신만을 위한 것이라 강하게 믿게 됩니다.">
+        <div class="section-badge">방탄 마인드 ②</div>
+        <h2>방탄 마인드 ②<br><span class="hl">"대놓고 밀어내라"</span></h2>
+        <p class="subtitle">자격 없는 고객에게 선 긋기</p>
+        <div style="margin-top:2%; width:64%; display:flex; flex-direction:column; align-items:center; gap:0.9em;">
+          <div style="width:100%; padding:1.2em 2em; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:12px; text-align:center;" data-step="1">
+            <p style="font-size:clamp(0.9rem,1.7vw,1.45rem); color:rgba(255,255,255,0.85); line-height:1.7; word-break:keep-all;">맞지 않는 고객을 <strong style="color:var(--green);">의도적으로 밀어내어</strong> 자격 없는 리드를 필터링한다</p>
+          </div>
+          <div style="width:100%; display:flex; flex-direction:column; gap:0.6em;" data-step="2">
+            <div style="padding:0.8em 1.6em; background:var(--green-dim); border:1px solid var(--green-border); border-radius:10px; text-align:center;">
+              <span style="font-size:clamp(0.8rem,1.5vw,1.25rem); color:var(--white); font-weight:700;">"실행할 마음이 없다면 지금 당장 끄세요"</span>
+            </div>
+            <div style="padding:0.8em 1.6em; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; text-align:center;">
+              <span style="font-size:clamp(0.8rem,1.5vw,1.25rem); color:rgba(255,255,255,0.8);">선명한 경계가 진성 고객의 신뢰를 높인다</span>
+            </div>
+            <div style="padding:0.8em 1.6em; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; text-align:center;">
+              <span style="font-size:clamp(0.8rem,1.5vw,1.25rem); color:rgba(255,255,255,0.8);">남은 고객은 '나만을 위한 제안'이라 확신한다</span>
+            </div>
+          </div>
+          <div style="font-size:clamp(0.6rem,1vw,0.88rem); color:var(--muted); margin-top:0.2em;">— 대니얼 아이리스</div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 11 · Before / After
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="세 번째, 고객을 일부러 귀찮게 만드십시오. 알렉스 홀모지의 핵심 전략입니다. 고객을 귀찮게 하는 '마찰(Friction)'을 의도적으로 추가하여, 영업 통화 전 고객을 완벽히 준비된 상태로 만들어야 합니다. 상담 가는 길을 너무 매끄럽게 만들지 마세요. 질문도 많이 하고, 영상도 길게 보게 만드세요. 그 마찰을 다 뚫고 온 사람은 세일즈하기가 압도적으로 쉬워집니다.">
+        <div class="section-badge">방탄 마인드 ③</div>
+        <h2>방탄 마인드 ③<br><span class="hl">"일부러 귀찮게 하라"</span></h2>
+        <p class="subtitle">세일즈가 쉬워지는 '좋은 마찰력'</p>
+        <div class="ba-container">
+          <div class="ba-panel ba-after danger" data-step="1">
+            <div class="ba-icon" style="background:rgba(255,85,85,0.15); color:var(--red);">🛝</div>
+            <div class="ba-label" style="color:var(--red);">매끄러운 미끄럼틀</div>
+            <div class="ba-desc">허들 없이 바로 상담<br>구경꾼이 쉽게 진입<br>→ 세일즈 고통, 낮은 결제율</div>
+          </div>
+          <div style="width:1px; background:rgba(255,255,255,0.08); flex-shrink:0;"></div>
+          <div class="ba-panel ba-after" data-step="2">
+            <div class="ba-icon" style="background:var(--green-dim); color:var(--green);">🪜</div>
+            <div class="ba-label" style="color:var(--green);">험난한 계단</div>
+            <div class="ba-desc">OT 영상 · 긴 설문 · 가격 공개<br>마찰을 뚫고 온 진성 고객<br>→ 세일즈가 압도적으로 쉬움</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 12 · VS Card
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="이 3가지 방탄 마인드를 장착하지 않으면, 우리는 평생 '제발 결제 좀 해주세요'라며 구걸하는 판매자로 남아야 합니다. 하지만 이 마인드를 완벽히 장착하는 순간, 세일즈 판에서 우리의 포지션은 완전히 바뀝니다. '대표님은 제 기준에 맞지 않으시네요, 저는 도와드릴 수 없습니다.'라고 당당히 거절하는 전문가가 되는 겁니다.">
+        <div class="section-badge">포지셔닝 전환</div>
+        <h2><span class="hl-r">구걸하는 판매자</span> vs <span class="hl">거절하는 전문가</span></h2>
+        <p class="subtitle">방탄 마인드가 당신의 포지션을 바꿉니다</p>
+        <div class="vs-grid">
+          <div class="vs-card red-card" data-step="1">
+            <div class="vs-card-title" style="color:var(--red);">😓 구걸하는 판매자</div>
+            <div class="vs-card-desc">방탄 마인드 없음</div>
+            <div class="vs-card-body">"제발 결제 좀<br>해주세요…"</div>
+            <div class="vs-card-quote">문의 한 건이라도 더 받으려<br>에너지를 갈아 넣는다</div>
+          </div>
+          <div class="vs-card green-card" data-step="2">
+            <div class="vs-card-title" style="color:var(--green);">💼 거절하는 전문가</div>
+            <div class="vs-card-desc">방탄 마인드 완전 장착</div>
+            <div class="vs-card-body">"대표님은 제 기준에<br>맞지 않으시네요"</div>
+            <div class="vs-card-quote">거절로 희귀성이 높아지고<br>갑을 관계가 역전된다</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────
+         SLIDE 13 · Numbered Steps
+    ───────────────────────────────── -->
+      <section class="slide"
+        data-notes="오늘 강의가 끝나면 당장 내 비즈니스에 적용할 '첫 번째 허들'을 딱 하나만 설계해 보세요. 가격을 대놓고 공개할지, OT 영상을 필수로 보게 할지, 아니면 아주 깐깐한 설문지를 하나 추가할지 말이죠. 다시 한번 당부드립니다. 이 허들을 치고 나서 문의가 줄어드는 것을 절대 두려워하지 마십시오. 그게 바로 진짜 VSL 필터링이 완벽하게 작동하고 있다는 증거입니다.">
+        <div class="section-badge">오늘의 액션</div>
+        <h2>오늘의 액션: 내 비즈니스의<br><span class="hl">'첫 번째 허들'</span> 설계하기</h2>
+        <p class="subtitle">문의가 줄어드는 것을 절대 두려워하지 마십시오</p>
+        <div class="steps-wrapper">
+          <div class="step-row" data-step="1">
+            <div class="step-num">A</div>
+            <div class="step-body">
+              <div class="step-title">가격을 대놓고 공개하기</div>
+              <div class="step-desc">550만 원처럼 구체적 가격을 영상/페이지에 노출</div>
+            </div>
+          </div>
+          <div class="step-row" data-step="2">
+            <div class="step-num">B</div>
+            <div class="step-body">
+              <div class="step-title">OT 영상, 칼럼 등</div>
+              <div class="step-desc">상담 신청 전 필수 시청 완료 조건 설정</div>
+            </div>
+          </div>
+          <div class="step-row" data-step="3">
+            <div class="step-num">C</div>
+            <div class="step-body">
+              <div class="step-title">깐깐한 설문지 설계</div>
+              <div class="step-desc">진심 있는 지원자만 통과하는 선발 필터</div>
+            </div>
+          </div>
+        </div>
+        <div class="callout" data-step="4">
+          ✅ 허들 후 문의가 줄어드는 건 <strong style="color:var(--green)">필터링이 정상 작동하고 있다는 증거</strong>입니다
+        </div>
+      </section>
+
+    </div><!-- /deck -->
+  </div><!-- /stage -->
+
+  <!-- Slide counter -->
+  <div class="slide-counter" id="slideCounter">1 / 14</div>
+
+  <!-- Nav buttons -->
+  <button class="nav-btn nav-prev" id="prevBtn" aria-label="이전">‹</button>
+  <button class="nav-btn nav-next" id="nextBtn" aria-label="다음">›</button>
+
+  <!-- Thumbnail nav -->
+  <div class="thumbnail-nav" id="thumbNav"></div>
+
+  <!-- Hint -->
+  <div class="hint">← → 키 또는 스와이프&nbsp;&nbsp;|&nbsp;&nbsp;F: 전체화면&nbsp;&nbsp;|&nbsp;&nbsp;S: 강사 멘트</div>
+
+  <!-- Notes panel -->
+  <div class="notes-panel" id="notesPanel">
+    <div class="notes-title">▸ INSTRUCTOR NOTES</div>
+    <div class="notes-body" id="notesBody"></div>
+    <div class="notes-close">[ S ] 또는 클릭하여 닫기</div>
+  </div>
+
+  <script>
+    class Deck {
+      constructor() {
+        this.slides = [...document.querySelectorAll('.slide')];
+        this.total = this.slides.length;
+        this.current = 0;
+        this.locked = false;
+        this.notesOpen = false;
+
+        this.progressFill = document.getElementById('progressFill');
+        this.slideCounter = document.getElementById('slideCounter');
+        this.thumbNav = document.getElementById('thumbNav');
+        this.notesPanel = document.getElementById('notesPanel');
+        this.notesBody = document.getElementById('notesBody');
+
+        this._buildThumbs();
+        this._updateUI();
+        this._attachEvents();
+        this._revealSteps(0);
+      }
+
+      _buildThumbs() {
+        this.slides.forEach((_, i) => {
+          const d = document.createElement('button');
+          d.className = 'thumb-dot' + (i === 0 ? ' active' : '');
+          d.setAttribute('aria-label', `슬라이드 ${i + 1}`);
+          d.addEventListener('click', () => this.goto(i));
+          this.thumbNav.appendChild(d);
+        });
+      }
+
+      _updateUI() {
+        const n = this.current + 1;
+        this.progressFill.style.width = `${(n / this.total) * 100}%`;
+        this.slideCounter.textContent = `${n} / ${this.total}`;
+        document.querySelectorAll('.thumb-dot').forEach((d, i) => {
+          d.classList.toggle('active', i === this.current);
+        });
+      }
+
+      _getSteps(slideEl) {
+        return [...slideEl.querySelectorAll('[data-step]')]
+          .sort((a, b) => +a.dataset.step - +b.dataset.step);
+      }
+
+      _revealSteps(idx) {
+        // Reset all steps on ALL slides
+        this.slides.forEach(s => {
+          s.querySelectorAll('[data-step]').forEach(el => el.classList.remove('visible'));
+        });
+        // Reveal step 1 of current slide (if any)
+        const steps = this._getSteps(this.slides[idx]);
+        if (steps.length > 0) steps[0].classList.add('visible');
+        this._currentStepIndex = steps.length > 0 ? 0 : -1;
+      }
+
+      _nextStep() {
+        const steps = this._getSteps(this.slides[this.current]);
+        if (steps.length === 0) return false;
+        const next = this._currentStepIndex + 1;
+        if (next < steps.length) {
+          steps[next].classList.add('visible');
+          this._currentStepIndex = next;
+          return true;
+        }
+        return false;
+      }
+
+      _prevStep() {
+        const steps = this._getSteps(this.slides[this.current]);
+        if (steps.length === 0) return false;
+        if (this._currentStepIndex > 0) {
+          steps[this._currentStepIndex].classList.remove('visible');
+          this._currentStepIndex--;
+          return true;
+        }
+        return false;
+      }
+
+      goto(idx, direction) {
+        if (this.locked || idx === this.current) return;
+        const from = this.current;
+        const dir = direction || (idx > from ? 1 : -1);
+
+        this.locked = true;
+        const outSlide = this.slides[from];
+        const inSlide = this.slides[idx];
+
+        outSlide.classList.remove('active');
+        outSlide.classList.add(dir > 0 ? 'prev' : 'next');
+
+        inSlide.classList.remove('prev', 'next', 'no-transition');
+        inSlide.style.transform = dir > 0 ? 'translateX(100%)' : 'translateX(-100%)';
+        inSlide.style.opacity = '0';
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            inSlide.style.transform = '';
+            inSlide.style.opacity = '';
+            inSlide.classList.add('active');
+          });
+        });
+
+        this.current = idx;
+        this._updateUI();
+        this._revealSteps(idx);
+
+        const unlock = () => {
+          this.locked = false;
+          outSlide.classList.remove('prev', 'next');
+        };
+
+        const handler = (e) => {
+          if (e.propertyName === 'transform') {
+            inSlide.removeEventListener('transitionend', handler);
+            unlock();
+          }
+        };
+        inSlide.addEventListener('transitionend', handler);
+        setTimeout(unlock, 600);
+      }
+
+      next() {
+        if (this._nextStep()) return;
+        if (this.current < this.total - 1) this.goto(this.current + 1, 1);
+      }
+
+      prev() {
+        if (this._prevStep()) return;
+        if (this.current > 0) this.goto(this.current - 1, -1);
+      }
+
+      toggleNotes() {
+        this.notesOpen = !this.notesOpen;
+        const notes = this.slides[this.current].dataset.notes || '';
+        this.notesBody.textContent = notes;
+        this.notesPanel.classList.toggle('visible', this.notesOpen);
+      }
+
+      _attachEvents() {
+        // Keyboard
+        document.addEventListener('keydown', (e) => {
+          if (e.repeat) return;
+          let handled = false;
+          switch (e.key) {
+            case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
+              this.next(); handled = true; break;
+            case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+              this.prev(); handled = true; break;
+            case 'Home': this.goto(0); handled = true; break;
+            case 'End': this.goto(this.total - 1); handled = true; break;
+            case 's': case 'S':
+              this.toggleNotes(); handled = true; break;
+            case 'f': case 'F':
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => { });
+              } else {
+                document.exitFullscreen().catch(() => { });
+              }
+              handled = true; break;
+          }
+          if (handled) e.preventDefault();
+        });
+
+        // Prev / Next buttons
+        document.getElementById('prevBtn').addEventListener('click', () => this.prev());
+        document.getElementById('nextBtn').addEventListener('click', () => this.next());
+
+        // Swipe / click on stage
+        let startX = 0, startT = 0;
+        const stage = document.querySelector('.stage');
+
+        stage.addEventListener('pointerdown', (e) => {
+          startX = e.clientX; startT = Date.now();
+        });
+        stage.addEventListener('pointerup', (e) => {
+          const dx = e.clientX - startX;
+          const dt = Date.now() - startT;
+          if (dt < 500 && Math.abs(dx) > 50) {
+            dx < 0 ? this.next() : this.prev();
+          } else if (dt < 200 && Math.abs(dx) < 10) {
+            this.next();
+          }
+        });
+
+        // Notes panel close on click
+        this.notesPanel.addEventListener('click', () => {
+          this.notesOpen = false;
+          this.notesPanel.classList.remove('visible');
+        });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => new Deck());
+  </script>
+</body>
+
+</html>

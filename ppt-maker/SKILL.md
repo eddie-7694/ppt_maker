@@ -585,7 +585,9 @@ Use when: key thesis, shocking statistic, emotional turning point, section break
 ---
 
 ### 2. Stat Callout — one number, maximum impact
-Use when: a single data point is the whole point of the slide.
+Use when: a single data point is the whole point of the slide. **진짜 임팩트 있는 숫자 하나**가 슬라이드 전체 메시지일 때만 사용한다.
+
+**절대 금지:** 숫자가 2개 이상이거나("97% vs 3%"), 숫자보다 텍스트 메시지가 핵심인 경우 Stat Callout 사용 금지. 이 경우 대신 **카드 블록 텍스트** 레이아웃을 사용한다 — 핵심 문장을 border가 있는 카드 안에 크게 배치하는 방식이 더 가독성이 높다.
 
 ```html
 <div class="stat-block">
@@ -720,7 +722,9 @@ Use when: 3–4 equal concepts that don't have a sequence. Arrange in a row or 2
 ---
 
 ### 10. Split — label/concept left, detail right
-Use when: introducing a term + its explanation, or a concept + examples side by side.
+Use when: introducing a term + its explanation, or a concept + examples side by side. **양쪽 모두 실질적인 콘텐츠가 있을 때만** 사용한다.
+
+**절대 금지:** 좌측에 "PUSH AWAY / 밀어내기 전략" 같이 장식용 대형 레이블만 넣고 우측에 실제 내용을 몰아넣는 구성. 이 경우 Split 대신 콘텐츠를 **중앙 정렬 카드 블록**으로 배치한다 — 본문 텍스트 + 카드형 bullet 아이템 + 출처를 세로로 쌓는 방식.
 
 ```html
 <div class="split-layout">
@@ -923,7 +927,10 @@ When given a topic or script, generate slides that tell a coherent story with vi
 
 **헤드카피·서브카피 원문 준수:** 슬라이드의 `h2`(헤드카피)와 `p.subtitle`(서브카피)는 스크립트의 **헤드카피·서브카피 텍스트를 그대로** 사용한다. 임의로 바꾸거나 재해석·요약하지 않는다. 스크립트에 헤드카피/서브카피가 명시된 경우 한 글자도 변경하지 않는다.
 
-**section-badge 사용 원칙:** `section-badge`는 슬라이드의 맥락을 나타내는 **짧은 레이블**(예: "섹션 2 · 개념 정의", "핵심 정리")로만 사용한다. 헤드카피나 서브카피 내용을 section-badge에 넣지 않는다. section-badge가 불필요하다면 생략해도 된다.
+**section-badge 사용 원칙:** `section-badge`는 슬라이드의 맥락을 나타내는 **짧은 키워드 레이블**로만 사용한다. 절대 금지:
+- "챕터 1-3 · 문제 정의" 처럼 챕터/강의 번호를 앞에 붙이는 것 — 강 번호는 제목이지 컨텍스트 레이블이 아니다
+- 올바른 예: "문제 정의", "전략 전환", "방탄 마인드 ①", "오늘의 액션"
+- section-badge가 불필요하다면 생략해도 된다
 
 Keep text concise — slides are visual aids, not documents. Each bullet/step fits in one line. Use `data-step` builds on individual component items so the audience can follow along.
 
